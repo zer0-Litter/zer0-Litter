@@ -1,0 +1,15 @@
+# Django Secret Key
+DJANGO_SECRET_KEY='장고키'
+
+#kakaomap 키
+#KAKAO_MAP_API_KEY = '나중에'
+
+# Database 설정
+DB_NAME=디비 이름
+DB_USER=본인 것
+DB_PASSWORD=본인 것
+DB_HOST=localhost
+DB_PORT=3306
+
+# 배포 시 False
+DEBUG=True
