@@ -11,5 +11,6 @@ DB_PASSWORD=본인 것
 DB_HOST=localhost
 DB_PORT=3306
 
+
 # 배포 시 False
 DEBUG=True
