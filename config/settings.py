@@ -47,7 +47,6 @@ INSTALLED_APPS = [
     'accounts',
     'complain',
     'chatbot',
-    'mypage',
     'dashboard',
 ]
 

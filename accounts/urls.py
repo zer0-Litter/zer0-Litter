@@ -17,8 +17,9 @@ Including another URLconf
 from django.urls import path
 from . import views  # 뷰가 있으면 import
 
-app_name = 'account'
+app_name = 'accounts'
 
 urlpatterns = [
-    path('login/', views.login, name='login'),  # 예시, views.home 함수가 있어야 함
+    path('login/', views.login, name='login'),
+    path('mypage_home/', views.mypage_home, name='mypage_home'),
 ]
