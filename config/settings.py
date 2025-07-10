@@ -47,7 +47,6 @@ INSTALLED_APPS = [
     'accounts',
     'complain',
     'chatbot',
-    'mypage',
     'dashboard',
 ]
 
@@ -99,6 +98,22 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+
+#mongoDB 설정_
+import os
+from pymongo import MongoClient
+from dotenv import load_dotenv
+
+load_dotenv()
+
+MONGO_DB_NAME = "complaints_db"
+MONGO_URI = os.getenv("MONGO_URI")
+
+mongo_client = MongoClient(MONGO_URI)
+mongo_db = mongo_client[MONGO_DB_NAME]
+
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
