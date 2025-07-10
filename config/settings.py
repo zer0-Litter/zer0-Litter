@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'complain',
     'chatbot',
     'dashboard',
+    'common',
 ]
 
 MIDDLEWARE = [
