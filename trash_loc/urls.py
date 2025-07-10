@@ -20,6 +20,9 @@ from . import views  # 뷰가 있으면 import
 app_name = 'trash_loc'
 
 urlpatterns = [
-    path('home/', views.home, name='home'),  # 예시, views.home 함수가 있어야 함
-    path('', views.trash_loc_list, name='trash_loc_list'),
+    path('home/', views.home, name='home'),
+    path('trash_loc/map/<str:district_idx>/', views.trash_bin_map, name='trash_bin_map'),
+    path('trash_loc/list/<str:district_idx>/', views.trash_bin_list, name='trash_bin_list'),
+    path('trash_bin/<int:bin_id>/detail/', views.trash_bin_detail, name='trash_bin_detail'), 
+    path('complain/<int:bin_id>/', views.complain, name='complain'),
 ]
