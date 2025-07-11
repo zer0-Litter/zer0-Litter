@@ -13,3 +13,6 @@ def logout(request):
     # 로그아웃 후 로그인 페이지로 리다이렉트
     return redirect('trash_loc/home.html')
 
+def mypage_home(request):
+    # 마이페이지 홈 렌더링
+    return render(request, 'accounts/mypage_home.html')

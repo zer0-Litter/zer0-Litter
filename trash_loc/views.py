@@ -1,4 +1,8 @@
 from django.shortcuts import render, redirect
+from django.http import HttpResponse
+from .models import TrashLoc
+
+# Create your views here.
 
 # 메인 소개 페이지
 # GET /home/
@@ -24,3 +28,8 @@ def trash_bin_detail(request, bin_id):
 # GET /complain/<int:bin_id>/
 def complain(request, bin_id):
     return redirect('/complain/complain_add/')
+
+# 테스트용! 작업할 땐 지우고 사용해주세요 (html도 포함!)
+# def trash_loc_list(request):
+#     trash_locs = TrashLoc.objects.all()
+#     return render(request, 'trash_loc_list.html', {'trash_locs': trash_locs})
