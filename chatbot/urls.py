@@ -19,6 +19,8 @@ from . import views  # 뷰가 있으면 import
 
 app_name = 'chatbot'
 
+
 urlpatterns = [
-    path('<int:scenario_id>/chatbot_chat/', views.chatbot_chat, name='chatbot_chat'),  # 예시, views.home 함수가 있어야 함
+    path('<int:scenario_id>/chatbot_chat/', views.chatbot_chat, name='chatbot_chat'), #시나리오 있을 때
+    path('chatbot_chat_default/', views.chatbot_chat_default, name='chatbot_chat_default'), # 없을 때
 ]
