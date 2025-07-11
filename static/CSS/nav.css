@@ -1,0 +1,90 @@
+/* static/css/nav.css */
+
+.app-wrapper {
+  width: 480px;
+  margin: 0 auto;
+  border: 1px solid #ddd;
+  min-height: 100vh;
+  box-shadow: 0 0 10px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background-color: #e8f5e9;
+  position: relative;
+  z-index: 100;
+}
+
+.logo img {
+  height: 40px;
+  vertical-align: middle;
+}
+
+.hamburger {
+  font-size: 1.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.side-menu {
+  position: absolute;
+  top: 3.5rem;
+  right: 1rem;
+  background: #ffffff;
+  border: 1px solid #ccc;
+  width: 200px;
+  z-index: 200;
+}
+
+.side-menu.hidden {
+  display: none;
+}
+
+.side-menu ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.side-menu li {
+  border-bottom: 1px solid #eee;
+}
+
+.side-menu a {
+  display: block;
+  padding: 0.75rem;
+  text-decoration: none;
+  color: black;
+}
+
+.side-menu a.active {
+  color: #2e7d32;
+  font-weight: bold;
+}
+
+main {
+  flex-grow: 1;
+  padding: 1rem;
+}
+
+.bottom-nav {
+  position: sticky;
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  justify-content: space-around;
+  background: #f1f8e9;
+  padding: 0.5rem 0;
+  border-top: 1px solid #ccc;
+}
+
+.bottom-nav a {
+  text-decoration: none;
+  color: #333;
+}
