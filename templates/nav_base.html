@@ -7,114 +7,9 @@
   <title>{% block title %}zer0 Litter{% endblock %}</title>
 
   {% load static %}
-
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: #f9f9f9;
-      display: flex;
-      justify-content: center;
-      height: 100%;
-    }
-
-    body {
-      font-family: sans-serif;
-    }
-
-    .app-wrapper {
-      width: 480px;
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-      border: 1px solid #ddd;
-      box-shadow: 0 0 10px rgba(0,0,0,0.05);
-      background-color: white;
-      position: relative;
-    }
-
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem;
-      background-color: #e8f5e9;
-      position: relative;
-      z-index: 100;
-    }
-
-    .logo img {
-      height: 40px;
-      vertical-align: middle;
-    }
-
-    .hamburger {
-      font-size: 1.5rem;
-      background: none;
-      border: none;
-    }
-
-    .side-menu {
-      position: absolute;
-      top: 3.5rem;
-      right: 1rem;
-      background: #ffffff;
-      border: 1px solid #ccc;
-      width: 200px;
-      z-index: 200;
-    }
-
-    .side-menu.hidden {
-      display: none;
-    }
-
-    .side-menu ul {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-
-    .side-menu li {
-      border-bottom: 1px solid #eee;
-    }
-
-    .side-menu a {
-      display: block;
-      padding: 0.75rem;
-      text-decoration: none;
-      color: black;
-    }
-
-    .side-menu a.active {
-      color: #2e7d32;
-      font-weight: bold;
-    }
-
-    main {
-      flex: 1;
-      padding: 1rem;
-      box-sizing: border-box;
-    }
-
-    .bottom-nav {
-      position: fixed;
-      bottom: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 480px;
-      display: flex;
-      justify-content: space-around;
-      background: #f1f8e9;
-      padding: 0.5rem 0;
-      border-top: 1px solid #ccc;
-      z-index: 999;
-    }
-
-    .bottom-nav a {
-      text-decoration: none;
-      color: #333;
-    }
-  </style>
+  <!-- CSS 분리된 외부 파일 로드 -->
+  <link rel="stylesheet" href="{% static 'css/common.css' %}">
+  <link rel="stylesheet" href="{% static 'css/nav.css' %}">
 </head>
 <body>
   <div class="app-wrapper">
@@ -144,19 +39,19 @@
       {% block content %}
       {% endblock %}
     </main>
-  </div>
 
-  <!-- ✅ 하단 고정 네비게이션 (app-wrapper 바깥) -->
-  <footer class="bottom-nav">
-    <a href="{% url 'trash_loc:home' %}">지도</a>
-    <a href="{% url 'complain:complain_add' %}">민원</a>
-    <a href="{% url 'accounts:mypage_home' %}">my</a>
-    {% if scenario_id %}
-      <a href="{% url 'chatbot:chatbot_chat' scenario_id=scenario_id %}">챗봇</a>
-    {% else %}
-      <a href="{% url 'chatbot:chatbot_chat_default' %}">챗봇</a>
-    {% endif %}
-  </footer>
+    <!-- ✅ 하단 네비게이션 -->
+    <footer class="bottom-nav">
+      <a href="{% url 'trash_loc:home' %}">지도</a>
+      <a href="{% url 'complain:complain_add' %}">민원</a>
+      <a href="{% url 'accounts:mypage_home' %}">my</a>
+      {% if scenario_id %}
+        <a href="{% url 'chatbot:chatbot_chat' scenario_id=scenario_id %}">챗봇</a>
+      {% else %}
+        <a href="{% url 'chatbot:chatbot_chat_default' %}">챗봇</a>
+      {% endif %}
+    </footer>
+  </div>
 
   <!-- ✅ 메뉴 토글 스크립트 -->
   <script>

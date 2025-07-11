@@ -144,6 +144,7 @@ USE_TZ = True
 
 # 배포 시 수정 해야 함.
 STATIC_URL = '/static/'
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
