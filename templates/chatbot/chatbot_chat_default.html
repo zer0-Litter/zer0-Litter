@@ -23,10 +23,16 @@
   <!-- 채팅창 -->
   <div class="chat-window" id="chatWindow">
     <!-- 메시지 예시 -->
+    <div class="chat-message assistant">
+      <div class="message-bubble">
+        <span class="icon">🤖</span>
+        <span class="text">안녕하세요. AI오엘입니다! <br> 무엇을 도와드릴까요?</span>
+      </div>
+    </div>
     <div class="chat-message user">
       <div class="message-bubble">
         <span class="icon">🙋‍♀️</span>
-        <span class="text">이 근처에 쓰레기통 있어요?</span>
+        <span class="text">이 근처에 쓰레기통 있어?</span>
       </div>
     </div>
     <div class="chat-message assistant">
@@ -88,10 +94,29 @@ function sendMessage() {
   appendMessage('user', message);
   input.value = '';
 
-  // TODO: 서버에 메시지 전송하고 응답 처리
+  const lowerMsg = message.toLowerCase();
+  const greetingResponses = {
+    '안녕': '안녕하세요! 무엇을 도와드릴까요?',
+    'hello': 'Hello! How can I help you?',
+    '고마워': '천만에요! 도움이 되었다니 기뻐요 😊',
+    '감사': '감사합니다! 언제든지 도와드릴게요.',
+    '잘가': '안녕히 가세요! 또 만나요 👋',
+    'bye': 'Goodbye! Take care!'
+  };
 
+  for (const key in greetingResponses) {
+    if (lowerMsg.includes(key)) {
+      setTimeout(() => {
+        appendMessage('assistant', greetingResponses[key]);
+      }, 600);
+      return false;
+    }
+  }
+
+  // TODO: 서버에 메시지 전송하고 응답 처리
   return false;
 }
+
 
 function uploadFile() {
   const fileInput = document.getElementById('fileUpload');
