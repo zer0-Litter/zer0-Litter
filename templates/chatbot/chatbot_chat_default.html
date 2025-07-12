@@ -1,78 +1,110 @@
+<!-- chatbot.html -->
 {% extends 'nav_base.html' %}
 {% load static %}
 
 {% block title %}챗봇{% endblock %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{% static 'css/chatbot.css' %}">
+  <link rel="stylesheet" href="{% static 'css/chatbot.css' %}">
 {% endblock %}
 
 {% block content %}
 <div class="chatbot-container">
+  <!-- 시나리오 선택 버튼 -->
   <div class="scenario-buttons">
-    <button onclick="startScenario('trash_finder')">근처 쓰레기통 위치 묻기</button>
-    <button onclick="startScenario('complain_report')">민원 제보하기</button>
+    <button class="scenario-btn" onclick="startScenario('trash_finder')">
+      🗑️ 쓰레기통 찾기
+    </button>
+    <button class="scenario-btn" onclick="startScenario('complain_report')">
+      📝 민원 제보하기
+    </button>
   </div>
 
-  <div class="chat-window" id="chatWindow"></div>
+  <!-- 채팅창 -->
+  <div class="chat-window" id="chatWindow">
+    <!-- 메시지 예시 -->
+    <div class="chat-message user">
+      <div class="message-bubble">
+        <span class="icon">🙋‍♀️</span>
+        <span class="text">이 근처에 쓰레기통 있어요?</span>
+      </div>
+    </div>
+    <div class="chat-message assistant">
+      <div class="message-bubble">
+        <span class="icon">🤖</span>
+        <span class="text">150m 근처에 쓰레기통이 2개 있습니다!</span>
+      </div>
+    </div>
+  </div>
 
-  <form id="chatForm" onsubmit="return sendMessage()">
-    <input type="text" id="messageInput" placeholder="메시지를 입력하세요..." autocomplete="off" />
-
-    <label for="fileInput" class="upload-btn">📷</label>
-    <input type="file" id="fileInput" accept="image/*" capture="environment" style="display:none" onchange="uploadFile()" />
-
+  <!-- 메시지 입력 -->
+  <form class="chat-input" id="chatForm" method="post" enctype="multipart/form-data" onsubmit="return sendMessage()">
+    {% csrf_token %}
+    <input type="text" name="message" id="messageInput" placeholder="메시지를 입력하세요..." autocomplete="off" />
+    <label for="fileUpload" class="file-label">📷</label>
+    <input type="file" id="fileUpload" name="file" accept="image/*" capture="environment" style="display: none;" onchange="uploadFile()">
     <button type="submit">전송</button>
   </form>
 </div>
 
 <script>
-  function startScenario(scenarioId) {
-    // 시나리오 시작용 메시지 출력 + 서버 호출 등 처리
-    appendMessage('assistant', `시나리오 "${scenarioId}" 시작합니다.`);
-    // 서버에 scenarioId 전달해 대화 초기화 요청 가능
+function startScenario(scenarioId) {
+  appendMessage('assistant', `시나리오 "${scenarioId}"를 시작합니다.`);
+  // TODO: 서버 요청으로 시나리오 초기화 가능
+}
+
+function appendMessage(role, text, imgUrl) {
+  const chatWindow = document.getElementById('chatWindow');
+  const msgDiv = document.createElement('div');
+  msgDiv.className = `chat-message ${role}`;
+
+  const bubble = document.createElement('div');
+  bubble.className = 'message-bubble';
+
+  const icon = document.createElement('span');
+  icon.className = 'icon';
+  icon.textContent = role === 'user' ? '🙋‍♀️' : '🤖';
+
+  const content = document.createElement('span');
+  content.className = 'text';
+  if (imgUrl) {
+    content.innerHTML = `<img src="${imgUrl}" alt="image" style="max-width:100px; max-height:100px;"><br>${text || ''}`;
+  } else {
+    content.textContent = text;
   }
 
-  function appendMessage(role, text, imgUrl) {
-    const chatWindow = document.getElementById('chatWindow');
-    const msgDiv = document.createElement('div');
-    msgDiv.className = role;
-    if(imgUrl){
-      msgDiv.innerHTML = `<img src="${imgUrl}" alt="image" style="max-width:100px; max-height:100px;"><br>${text || ''}`;
-    } else {
-      msgDiv.textContent = text;
-    }
-    chatWindow.appendChild(msgDiv);
-    chatWindow.scrollTop = chatWindow.scrollHeight;
-  }
+  bubble.appendChild(icon);
+  bubble.appendChild(content);
+  msgDiv.appendChild(bubble);
+  chatWindow.appendChild(msgDiv);
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+}
 
-  function sendMessage() {
-    const input = document.getElementById('messageInput');
-    const message = input.value.trim();
-    if(!message) return false;
+function sendMessage() {
+  const input = document.getElementById('messageInput');
+  const message = input.value.trim();
+  if (!message) return false;
 
-    appendMessage('user', message);
-    input.value = '';
+  appendMessage('user', message);
+  input.value = '';
 
-    // TODO: 서버에 텍스트 메시지 보내고 응답 받기 처리
+  // TODO: 서버에 메시지 전송하고 응답 처리
 
-    return false; // 폼 제출 막기
-  }
+  return false;
+}
 
-  function uploadFile() {
-    const fileInput = document.getElementById('fileInput');
-    const file = fileInput.files[0];
-    if (!file) return;
+function uploadFile() {
+  const fileInput = document.getElementById('fileUpload');
+  const file = fileInput.files[0];
+  if (!file) return;
 
-    // TODO: FormData로 서버에 이미지 업로드 처리
-    // 성공하면 appendMessage('user', '', imageUrl)로 썸네일 출력
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    appendMessage('user', '', e.target.result);
+  };
+  reader.readAsDataURL(file);
 
-    // 임시로 바로 미리보기만:
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      appendMessage('user', '', e.target.result);
-    };
-    reader.readAsDataURL(file);
-  }
+  // TODO: FormData를 이용해 서버에 전송 처리
+}
 </script>
 {% endblock %}
