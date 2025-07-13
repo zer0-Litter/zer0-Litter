@@ -1,0 +1,165 @@
+body {
+  margin: 0;
+  padding: 0;
+  font-family: "Noto Sans KR", sans-serif;
+  background-color: #fff;
+}
+
+.register-container {
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+  font-size: 18px;
+  font-weight: bold;
+  color: #222;
+}
+
+.back-arrow {
+  text-decoration: none;
+  font-size: 24px;
+  margin-right: 12px;
+  color: #333;
+}
+
+.top-title {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="date"],
+select {
+  width: 100%;
+  padding: 12px;
+  font-size: 14px;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  box-sizing: border-box;
+}
+
+.id-group .id-input-wrap {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.id-input-wrap input[type="text"] {
+  flex: 1;
+}
+
+.check-btn {
+  white-space: nowrap;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 8px;
+  background-color: #e3f1d5;
+  cursor: pointer;
+}
+
+.status-text {
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.gender-options {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.gender-options input[type="radio"] {
+  display: none;
+}
+
+.gender-options label {
+  background-color: #f0f0f0;
+  padding: 10px 15px;
+  border-radius: 10px;
+  cursor: pointer;
+  flex: 1;
+  text-align: center;
+}
+
+.gender-options input[type="radio"]:checked + label {
+  background-color: #4caf50;
+  color: #fff;
+  font-weight: bold;
+}
+
+.terms-container {
+  margin-top: 20px;
+}
+
+.terms-desc {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.terms-check {
+  font-size: 14px;
+  font-weight: normal;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.button-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.register-btn {
+  flex: 1;
+  padding: 12px;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.back-btn {
+  flex: 1;
+  padding: 12px;
+  background-color: #ddd;
+  color: #000;
+  text-align: center;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  border: 1px solid #aaa;
+  border-radius: 10px;
+  padding: 20px;
+  z-index: 999;
+}
