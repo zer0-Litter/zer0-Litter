@@ -1,0 +1,115 @@
+/* nav.css */
+
+.app-wrapper {
+  position: relative; /* 추가 */
+  width: 480px;
+  margin: 0 auto;
+  border: 1px solid #ddd;
+  min-height: 100vh;
+  box-shadow: 0 0 10px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background-color: #e8f5e9;
+  position: relative; /* 중요 */
+  z-index: 100;
+}
+
+.logo img {
+  height: 40px;
+  vertical-align: middle;
+}
+
+.hamburger {
+  position: relative;
+  z-index: 200;
+  font-size: 1.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.side-menu {
+  position: absolute;
+  top: 3.5rem;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #ccc;
+  width: 200px;
+  z-index: 150;
+  box-sizing: border-box;
+}
+
+.side-menu.hidden {
+  display: none;
+}
+
+.side-menu ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.side-menu li {
+  border-bottom: 1px solid #eee;
+}
+
+/* 햄버거 메뉴 a 기본은 normal, hover 시 굵게와 색상 변경 */
+.side-menu a {
+  display: block;
+  padding: 0.75rem;
+  text-decoration: none;
+  color: black;
+  font-weight: normal;  /* 기본 굵기 제거 */
+  transition: background-color 0.3s, color 0.3s, font-weight 0.3s;
+}
+
+.side-menu a:hover {
+  background-color: #dcedc8;
+  color: #2e7d32;
+  font-weight: bold;  /* hover 시 굵게 */
+  cursor: pointer;
+}
+
+/* 하단 네비게이션 a 기본는 normal, hover 시 굵게와 색상 변경 */
+.bottom-nav a {
+  text-decoration: none;
+  color: #333;
+  font-weight: normal;
+  transition: color 0.3s, font-weight 0.3s;
+}
+
+.bottom-nav a:hover {
+  color: #2e7d32;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+
+
+main {
+  flex-grow: 1;
+  padding: 1rem;
+}
+
+.bottom-nav {
+  position: sticky;
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  justify-content: space-around;
+  background: #f1f8e9;
+  padding: 0.5rem 0;
+  border-top: 1px solid #ccc;
+}
+
+.bottom-nav a {
+  text-decoration: none;
+  color: #333;
+}

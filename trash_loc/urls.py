@@ -23,4 +23,6 @@ urlpatterns = [
     path('home/', views.home, name='home'),  # 예시, views.home 함수가 있어야 함
     #path('', views.trash_loc_list, name='trash_loc_list'),
     path('', views.trash_map_view, name='trash_map'),
+    path('', views.home, name='home'),  # 예시, views.home 함수가 있어야 함
+    #path('', views.trash_loc_list, name='trash_loc_list'),
 ]

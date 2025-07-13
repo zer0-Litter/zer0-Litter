@@ -2,118 +2,59 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}zer0 Litter{% endblock %}</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      margin: 0;
-      padding-bottom: 60px; /* footer 공간 확보 */
-    }
 
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem;
-      background-color: #e8f5e9;
-    }
-
-    .hamburger {
-      font-size: 1.5rem;
-      background: none;
-      border: none;
-    }
-
-    .side-menu {
-      position: absolute;
-      top: 3.5rem;
-      right: 0;
-      background: #ffffff;
-      border: 1px solid #ccc;
-      width: 200px;
-      z-index: 1000;
-    }
-
-    .side-menu.hidden {
-      display: none;
-    }
-
-    .side-menu ul {
-      list-style: none;
-      padding: 0;
-    }
-
-    .side-menu li {
-      border-bottom: 1px solid #eee;
-    }
-
-    .side-menu a {
-      display: block;
-      padding: 0.75rem;
-      text-decoration: none;
-      color: black;
-    }
-
-    .side-menu a.active {
-      color: #2e7d32;
-      font-weight: bold;
-    }
-
-    .bottom-nav {
-      position: fixed;
-      bottom: 0;
-      width: 100%;
-      display: flex;
-      justify-content: space-around;
-      background: #f1f8e9;
-      padding: 0.5rem 0;
-      border-top: 1px solid #ccc;
-    }
-
-    .bottom-nav a {
-      text-decoration: none;
-      color: #333;
-    }
-  </style>
+  {% load static %}
+  <!-- CSS 분리된 외부 파일 로드 -->
+  <link rel="stylesheet" href="{% static 'css/common.css' %}">
+  <link rel="stylesheet" href="{% static 'css/nav.css' %}">
+  {% block extra_head %}{% endblock %}
 </head>
 <body>
+  <div class="app-wrapper">
+    <!-- ✅ 상단 헤더 -->
+    <header class="header">
+      <div class="logo">
+        <a href="{% url 'trash_loc:home' %}">
+          <img src="{% static 'img/logo.png' %}" alt="zer0 Litter" />
+        </a>
+      </div>
+      <button class="hamburger" onclick="toggleMenu()">☰</button>
+    </header>
 
-  <!-- ✅ 상단 햄버거 & 로고 -->
-  <header class="header">
-    <div class="logo">
-      <img src="{% static 'img/logo.svg' %}" alt="zer0 Litter">
-      zer0 Litter
-    </div>
-    <button class="hamburger" onclick="toggleMenu()">☰</button>
-  </header>
+    <!-- ✅ 햄버거 드롭다운 메뉴 -->
+    <nav id="sideMenu" class="side-menu hidden">
+      <ul>
+        <li><a href="{% url 'accounts:login' %}" class="active">로그인/회원가입</a></li>
+        <li><a href="{% url 'trash_loc:home' %}">쓰레기통 위치</a></li>
+        <li><a href="{% url 'complain:complain_add' %}">민원</a></li>
+        <li><a href="{% url 'accounts:mypage_home' %}">마이페이지</a></li>
+        <li><a href="{% url 'dashboard:dashboard' %}">통계보기</a></li>
+      </ul>
+    </nav>
 
-  <!-- ✅ 햄버거 드롭다운 메뉴 -->
-  <nav id="sideMenu" class="side-menu hidden">
-    <ul>
-      <li><a href="{% url 'accounts:login' %}" class="active">로그인/회원가입</a></li>
-      <li><a href="{% url 'trash_loc:home' %}">쓰레기통 위치</a></li>
-      <li><a href="{% url 'complain:complain_add' %}">민원</a></li>
-      <li><a href="{% url 'mypage:mypage' %}">마이페이지</a></li>
-      <li><a href="{% url 'dashboard:dashbord' %}">통계보기</a></li>
-    </ul>
-  </nav>
+    <!-- ✅ 본문 영역 -->
+    <main>
+      {% block content %}
+      {% endblock %}
+    </main>
 
-  <!-- ✅ 본문 -->
-  <main>
-    {% block content %}
-    {% endblock %}
-  </main>
+    <!-- ✅ 하단 네비게이션 -->
+    <footer class="bottom-nav">
+      <a href="{% url 'trash_loc:home' %}">지도</a>
+      <a href="{% url 'complain:complain_add' %}">민원</a>
+      <a href="{% url 'accounts:mypage_home' %}">my</a>
+      {% if scenario_id %}
+        <a href="{% url 'chatbot:chatbot_chat' scenario_id=scenario_id %}">챗봇</a>
+      {% else %}
+        <a href="{% url 'chatbot:chatbot_chat_default' %}">챗봇</a>
+      {% endif %}
+    </footer>
+  </div>
 
-  <!-- ✅ 하단 네비게이션 -->
-  <footer class="bottom-nav">
-    <a href="{% url 'trash_loc:map' %}">지도</a>
-    <a href="{% url 'complain:main' %}">민원</a>
-    <a href="{% url 'mypage:main' %}">my</a>
-    <a href="{% url 'chatbot:main' %}">AI요엘</a>
-  </footer>
-
+  <!-- ✅ 메뉴 토글 스크립트 -->
   <script>
     function toggleMenu() {
       const menu = document.getElementById("sideMenu");

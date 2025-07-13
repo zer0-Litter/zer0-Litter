@@ -19,10 +19,9 @@ from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('trash_loc.urls')),
-    # path('accounts/', include('accounts.urls')),
-    # path('complain/', include('complain.urls')),
-    # path('chatbot/', include('chatbot.urls')),
-    # path('mypage/', include('mypage.urls')),
-    # path('dashboard/', include('dashboard.urls')),
+    path('', include('trash_loc.urls', namespace='trash_loc')),
+    path('accounts/', include('accounts.urls', namespace='accounts')),
+    path('complain/', include('complain.urls', namespace='complain')),
+    path('chatbot/', include('chatbot.urls', namespace='chatbot')),
+    path('dashboard/', include('dashboard.urls', namespace='dashboard')),
 ]
