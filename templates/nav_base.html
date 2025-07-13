@@ -21,13 +21,18 @@
           <img src="{% static 'img/logo.png' %}" alt="zer0 Litter" />
         </a>
       </div>
-      <button class="hamburger" onclick="toggleMenu()">☰</button>
+      <div style="display: flex; align-items: center;">
+        <!-- 로그아웃 버튼 (로그인 시에만 보임) -->
+        <button id="logout-btn" style="display: none; margin-right: 10px;">로그아웃</button>
+
+          <button class="hamburger" onclick="toggleMenu()">☰</button>
+      </div>
     </header>
 
     <!-- ✅ 햄버거 드롭다운 메뉴 -->
     <nav id="sideMenu" class="side-menu hidden">
       <ul>
-        <li><a href="{% url 'accounts:login' %}" class="active">로그인/회원가입</a></li>
+        <li id="login-menu"><a href="{% url 'accounts:login' %}" class="active">로그인/회원가입</a></li>
         <li><a href="{% url 'trash_loc:home' %}">쓰레기통 위치</a></li>
         <li><a href="{% url 'complain:complain_add' %}">민원</a></li>
         <li><a href="{% url 'accounts:mypage_home' %}">마이페이지</a></li>
@@ -60,6 +65,30 @@
       const menu = document.getElementById("sideMenu");
       menu.classList.toggle("hidden");
     }
+
+    // 로그인 상태 체크: access_token 있으면 로그아웃 버튼 표시
+    window.addEventListener('DOMContentLoaded', function () {
+      const accessToken = localStorage.getItem('access_token');
+      const logoutBtn = document.getElementById('logout-btn');
+      const loginMenu = document.getElementById('login-menu'); // 햄버거 메뉴 속 로그인 회원가입
+
+      if (accessToken) {
+        if(logoutBtn) logoutBtn.style.display = 'inline-block';  // 로그인 상태
+        if(loginMenu) loginMenu.style.display = 'none'; // 로그인 시 햄버거 바 안 로그인, 회원가입 숨김
+      } else {
+        if(logoutBtn) logoutBtn.style.display = 'none';  // 비로그인 상태
+        if(loginMenu) loginMenu.style.display = 'block'; // 비로그인 상태면 표시
+      }
+    });
+
+    // 로그아웃 버튼 클릭 시
+    document.getElementById('logout-btn')?.addEventListener('click', function (e) {
+      e.preventDefault();
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      alert("로그아웃 되었습니다.");
+      window.location.href = "{% url 'accounts:login' %}";
+    });
   </script>
 </body>
 </html>
