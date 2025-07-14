@@ -1,0 +1,134 @@
+body {
+  font-family: 'Noto Sans KR', sans-serif;
+  background-color: #ffffff;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.login-container {
+  margin-top: 120px;
+  width: 100%;
+  text-align: center;
+}
+
+.login-title {
+  font-size: 40px;
+  color: #5cb85c;
+  font-weight: bold;
+  text-shadow: 2px 2px #c1eac1;
+  margin-bottom: 30px;
+}
+
+.input-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.login-input {
+  width: 250px;
+  padding: 15px;
+  font-size: 18px;
+  border: none;
+  border-radius: 40px;
+  background: #fff;
+  box-shadow: 5px 5px 0px #cdecc9;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.login-buttons {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+}
+
+.login-btn,
+.signup-btn {
+  padding: 12px 25px;
+  font-size: 16px;
+  font-weight: bold;
+  border: none;
+  border-radius: 20px;
+  background-color: #d7eaff;
+  box-shadow: 3px 3px 0px #9bbfd8;
+  cursor: pointer;
+  color: black;
+  text-decoration: none;
+}
+
+.login-btn:hover,
+.signup-btn:hover {
+  background-color: #aacbe2;
+}
+
+.login-bottom-link {
+  margin-top: 30px;
+  font-size: 14px;
+}
+
+.login-bottom-link a {
+  color: #007bff;
+  text-decoration: none;
+}
+.login-bottom-link a:hover {
+  text-decoration: underline;
+}
+
+/* 모달 영역 */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.modal-content {
+  background-color: #fff;
+  padding: 30px 40px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  max-width: 300px;
+  width: 90%;
+  position: relative;
+}
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.modal-content h2 {
+  font-size: 20px;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.modal-button {
+  background-color: #4CAF50;
+  color: white;
+  padding: 10px 25px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+}
+.modal-button:hover {
+  background-color: #43a047;
+}

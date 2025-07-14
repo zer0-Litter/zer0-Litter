@@ -14,14 +14,11 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-from django.contrib import admin
-from django.urls import path, include
+from django.urls import path
+from . import views  # 뷰가 있으면 import
+
+app_name = 'complain'
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('', include('trash_loc.urls', namespace='trash_loc')),
-    path('accounts/', include('accounts.urls', namespace='accounts')),
-    path('complain/', include('complain.urls', namespace='complain')),
-    path('chatbot/', include('chatbot.urls', namespace='chatbot')),
-    path('dashboard/', include('dashboard.urls', namespace='dashboard')),
+    path('complain_add/', views.complain_add, name='complain_add'),  # 예시, views.home 함수가 있어야 함
 ]
