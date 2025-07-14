@@ -20,6 +20,9 @@ from . import views  # 뷰가 있으면 import
 app_name = 'accounts'
 
 urlpatterns = [
-    path('login/', views.login, name='login'),
+    path('login/', views.login, name='login'), #로그인 페이지
+    path('check_user_id/',views.check_user_id, name='check_user_id'),
     path('mypage_home/', views.mypage_home, name='mypage_home'),
+    path('login/submit/', views.LoginView.as_view(), name='login_view'), #로그인 처리
+    path('register/', views.RegisterView.as_view(),name='register'), #회원가입 페이지
 ]
