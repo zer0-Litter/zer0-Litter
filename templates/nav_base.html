@@ -10,6 +10,8 @@
   <!-- CSS 분리된 외부 파일 로드 -->
   <link rel="stylesheet" href="{% static 'css/common.css' %}">
   <link rel="stylesheet" href="{% static 'css/nav.css' %}">
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -92,5 +94,8 @@
       window.location.href = "{% url 'trash_loc:home' %}";
     });
   </script>
+
+  <!-- Bootstrap JS Bundle (modal 포함) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

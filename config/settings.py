@@ -194,3 +194,6 @@ LOGGING = {
 INTERNAL_IPS = [
     '127.0.0.1',  # 로컬 환경 에서만 툴바가 뜨도록
 ]
+
+LOGIN_URL = '/accounts/login/'  # 로그인하지 않았을 때 이동할 로그인 페이지
+LOGIN_REDIRECT_URL = '/trach_loc/home/'  # 로그인 후 이동할 기본 페이지

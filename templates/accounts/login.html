@@ -8,6 +8,15 @@
 {% block title %}로그인{% endblock %}
 
 {% block content %}
+
+{% if messages %}
+  <div class="alert alert-success">
+    {% for message in messages %}
+      {{ message }}
+    {% endfor %}
+  </div>
+{% endif %}
+
 <div class="login-container">
   <h1 class="login-title">Log In</h1>
 
@@ -15,8 +24,8 @@
     {% csrf_token %}
 
     <div class="input-wrapper">
-      <input type="text" id="username" name="username" class="login-input" required placeholder="아이디" />
-      <input type="password" id="password" name="password" class="login-input" required placeholder="비밀번호" />
+      <input type="text" name="username" class="login-input" required placeholder="아이디" />
+      <input type="password" name="password" class="login-input" required placeholder="비밀번호" />
     </div>
 
     <div class="login-buttons">
@@ -24,26 +33,44 @@
       <a href="{% url 'accounts:register' %}" class="signup-btn">회원가입</a>
     </div>
   </form>
-
-  <p class="login-bottom-link">
-    회원가입이 아직 안되셨나요? <a href="{% url 'accounts:register' %}">회원가입</a>
-  </p>
 </div>
 
-<!-- 모달창 -->
+<!-- ✅ 로그인 성공 모달 -->
 <div class="modal-overlay" id="modal" style="display: none;">
   <div class="modal-content">
-    <button class="modal-close" onclick="closeModal()">×</button>
+    <button class="modal-close" onclick="closeModal('modal')">×</button>
     <h2 id="modal-message">환영합니다</h2>
-    <button class="modal-button" onclick="closeModal()">닫기</button>
+    <button class="modal-button" onclick="closeModal('modal')">닫기</button>
+  </div>
+</div>
+
+<!-- ✅ 탈퇴 후 메시지용 모달 -->
+<div class="modal-overlay" id="delete-modal" style="display: none;">
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeModal('delete-modal')">×</button>
+    <h2 id="delete-modal-message">계정이 성공적으로 삭제되었습니다.</h2>
+    <button class="modal-button" onclick="goHome()">홈으로</button>
   </div>
 </div>
 
 <script>
-  function closeModal() {
-    document.getElementById('modal').style.display = 'none';
+  function closeModal(id) {
+    document.getElementById(id).style.display = 'none';
   }
 
+  function goHome() {
+    window.location.href = "/";
+  }
+
+  // 계정 탈퇴 후 모달 자동 표시
+  window.addEventListener("DOMContentLoaded", () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("status") === "deleted") {
+      document.getElementById('delete-modal').style.display = 'flex';
+    }
+  });
+
+  // ✅ 로그인 성공 시 모달 표시 로직
   document.getElementById('login-form').addEventListener('submit', function(event) {
     event.preventDefault();
     const formData = new FormData(event.target);
@@ -77,6 +104,8 @@
     });
   });
 </script>
+
 {% endblock %}
+
 
 
