@@ -5,6 +5,7 @@ from django.contrib.auth.models import AbstractUser
 
 # Create your models here.
 
+
 class Users(AbstractUser):
     # username = 아이디 (기본 제공)
     # password = 비밀번호 (기본 제공)
