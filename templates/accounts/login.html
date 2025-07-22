@@ -9,14 +9,6 @@
 
 {% block content %}
 
-{% if messages %}
-  <div class="alert alert-success">
-    {% for message in messages %}
-      {{ message }}
-    {% endfor %}
-  </div>
-{% endif %}
-
 <div class="login-container">
   <h1 class="login-title">Log In</h1>
 
@@ -35,42 +27,21 @@
   </form>
 </div>
 
-<!-- ✅ 로그인 성공 모달 -->
-<div class="modal-overlay" id="modal" style="display: none;">
-  <div class="modal-content">
-    <button class="modal-close" onclick="closeModal('modal')">×</button>
-    <h2 id="modal-message">환영합니다</h2>
-    <button class="modal-button" onclick="closeModal('modal')">닫기</button>
-  </div>
-</div>
+{% if messages %}
+  {% for message in messages %}
+    {% if message %}
+      <script>
+        window.addEventListener('DOMContentLoaded', () => {
+          showModal(`{{ message|escapejs }}`);
+        });
+      </script>
+    {% endif %}
+  {% endfor %}
+{% endif %}
 
-<!-- ✅ 탈퇴 후 메시지용 모달 -->
-<div class="modal-overlay" id="delete-modal" style="display: none;">
-  <div class="modal-content">
-    <button class="modal-close" onclick="closeModal('delete-modal')">×</button>
-    <h2 id="delete-modal-message">계정이 성공적으로 삭제되었습니다.</h2>
-    <button class="modal-button" onclick="goHome()">홈으로</button>
-  </div>
-</div>
+
 
 <script>
-  function closeModal(id) {
-    document.getElementById(id).style.display = 'none';
-  }
-
-  function goHome() {
-    window.location.href = "/";
-  }
-
-  // 계정 탈퇴 후 모달 자동 표시
-  window.addEventListener("DOMContentLoaded", () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get("status") === "deleted") {
-      document.getElementById('delete-modal').style.display = 'flex';
-    }
-  });
-
-  // ✅ 로그인 성공 시 모달 표시 로직
   document.getElementById('login-form').addEventListener('submit', function(event) {
     event.preventDefault();
     const formData = new FormData(event.target);
@@ -81,26 +52,16 @@
     })
     .then(response => response.json())
     .then(data => {
-      const modal = document.getElementById('modal');
-      const modalMessage = document.getElementById('modal-message');
-
-      modalMessage.textContent = data.message || '로그인 성공!';
-      modal.style.display = 'flex';
-
       if (data.access) {
         localStorage.setItem('access_token', data.access);
         localStorage.setItem('refresh_token', data.refresh);
-        setTimeout(function() {
-          window.location.href = "/";
-        }, 2000);
+        window.location.href = '/';  // 바로 홈 이동
+      } else {
+        showModal(data.message || '로그인 실패');
       }
     })
     .catch(error => {
-      const modal = document.getElementById('modal');
-      const modalMessage = document.getElementById('modal-message');
-
-      modalMessage.textContent = '로그인 중 오류가 발생했습니다.';
-      modal.style.display = 'flex';
+      showModal('로그인 중 오류가 발생했습니다.');
     });
   });
 </script>

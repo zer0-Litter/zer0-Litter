@@ -1,5 +1,7 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
+from django.utils.decorators import method_decorator
+from rest_framework.parsers import MultiPartParser,FormParser
 from common.models import Users
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -13,33 +15,30 @@ from django.http import JsonResponse
 from django.contrib.auth import login as auth_login
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth import logout
-from django.urls import reverse
 import json
 import re
+from common.models_mongo import Complaints, ComplaintStatus
+
+
 
 # Create your views here.
 
+@method_decorator(csrf_exempt, name='dispatch')
 class RegisterView(APIView):
-    def get(self,request):
-        # get 요청에 대해 회원가입 폼을 렌더링
+    parser_classes = [MultiPartParser, FormParser]
+
+    def get(self, request):
         return render(request, 'accounts/register.html')
 
     def post(self, request):
-        # 시리얼라이저에 데이터 전달
-        serializer = UserRegisterSerializer(data=request.data)
+        # FormData이므로 request.data를 그대로 쓰면 오류 발생 가능 → request.POST로 받음
+        serializer = UserRegisterSerializer(data=request.POST)
 
-        # 시리얼라이저가 유효한지 확인
         if serializer.is_valid():
-            # 데이터 저장
             user = serializer.save()
-            return Response({
-                "message": f"{user.username} 가입해주셔서 감사합니다",
-                "username": user.username
-            }, status=status.HTTP_201_CREATED)
+            return JsonResponse({"username": user.username}, status=201)
 
-        # 유효하지 않으면 오류 리턴
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+        return JsonResponse(serializer.errors, status=400)
 
 @csrf_exempt
 def check_user_id(request):
@@ -83,12 +82,11 @@ class LoginView(APIView):
         # Django 세션 로그인 수행
         auth_login(request, user)
 
-        # 로그인 성공 후, 사용자 아이디와 환영 메시지 반환
+        # 로그인 성공 후, 최소 데이터만 반환
         return Response({
-            "message": f"{username} 님 환영합니다!",
             "username": username,
-            "access" : str(refresh.access_token),
-            "refresh" : str(refresh)
+            "access": str(refresh.access_token),
+            "refresh": str(refresh)
         }, status=status.HTTP_200_OK)
 
 
@@ -162,10 +160,30 @@ def delete_user(request):
         logout(request)     # 세션에서 로그아웃
         user.delete()       # DB에서 계정 삭제
         messages.success(request, '계정이 성공적으로 삭제되었습니다.')
-        return redirect(reverse('accounts:login_view') + '?status=deleted')  # 로그인 페이지로 이동
+        return redirect('accounts:login')  # HTML 로그인 폼 뷰로 이동
     else:
         return redirect('accounts:mypage_home')  # POST 아닌 경우 마이페이지로
 
 
+@login_required
 def mypage_home(request):
-    return render(request, 'accounts/mypage_home.html')
+    username = request.user.username
+
+    # 로그인한 유저의 민원 리스트 가져오기
+    user_complaints = Complaints.objects(user_id=username).order_by('-com_reg_date')
+
+    # 각 민원에 대응하는 상태 이름을 붙여줌
+    complaint_list = []
+    for complaint in user_complaints:
+        status = ComplaintStatus.objects(status_id=str(complaint.status_id)).first()
+        complaint_list.append({
+            'title': complaint.com_title,
+            'date': complaint.com_reg_date,
+            'type': complaint.com_type,
+            'location': complaint.com_location,
+            'status': status.status_name if status else '알 수 없음'
+        })
+
+    return render(request, 'mypage_home.html', {
+        'complaints': complaint_list
+    })

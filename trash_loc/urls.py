@@ -21,7 +21,7 @@ app_name = 'trash_loc'
 
 urlpatterns = [
     path('', views.home, name='home'),
-#    path('trash_loc/map/<str:district_id>/', views.trash_bin_map, name='trash_bin_map'),  # 지도 기반 추천
-#    path('trash_loc/list/<str:district_id>/', views.trash_bin_list, name='trash_bin_list'),  # 목록 조회
+    #path('trash_loc/map/<str:district_id>/', views.trash_bin_map, name='trash_bin_map'),  # 지도 기반 추천
+    #path('trash_loc/list/<str:district_id>/', views.trash_bin_list, name='trash_bin_list'),  # 목록 조회
 
 ]

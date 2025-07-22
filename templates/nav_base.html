@@ -10,8 +10,6 @@
   <!-- CSS 분리된 외부 파일 로드 -->
   <link rel="stylesheet" href="{% static 'css/common.css' %}">
   <link rel="stylesheet" href="{% static 'css/nav.css' %}">
-  <!-- Bootstrap CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -24,8 +22,7 @@
         </a>
       </div>
       <div style="display: flex; align-items: center;">
-
-          <button class="hamburger" onclick="toggleMenu()">☰</button>
+        <button class="hamburger" onclick="toggleMenu()">☰</button>
       </div>
     </header>
 
@@ -46,8 +43,7 @@
 
     <!-- ✅ 본문 영역 -->
     <main>
-      {% block content %}
-      {% endblock %}
+      {% block content %}{% endblock %}
     </main>
 
     <!-- ✅ 하단 네비게이션 -->
@@ -63,25 +59,66 @@
     </footer>
   </div>
 
-  <!-- ✅ 메뉴 토글 스크립트 -->
+  <!-- 공통 모달 -->
+  <div id="common-modal" class="modal-overlay">
+    <div class="modal-content">
+      <span id="close-btn" onclick="hideModal()">×</span>
+      <p id="modal-message"></p>
+      <button id="modal-confirm-btn" onclick="hideModal()">확인</button>
+    </div>
+  </div>
+
   <script>
+    function showModal(message, redirectUrl = null, delay = 2000) {
+      const modal = document.getElementById('common-modal');
+      const messageBox = document.getElementById('modal-message');
+      const confirmBtn = document.getElementById('modal-confirm-btn');
+      messageBox.innerHTML = message;
+      messageBox.dataset.active = "true";
+      modal.style.display = 'flex';
+
+      confirmBtn.onclick = () => {
+        hideModal();
+        if (redirectUrl) {
+          setTimeout(() => {
+            window.location.href = redirectUrl;
+          }, delay);
+        }
+      };
+    }
+
+    function hideModal() {
+      document.getElementById('common-modal').style.display = 'none';
+      const messageBox = document.getElementById('modal-message');
+      messageBox.dataset.active = "false";
+    }
+
     function toggleMenu() {
       const menu = document.getElementById("sideMenu");
       menu.classList.toggle("hidden");
     }
 
-    // 로그인 상태 체크: access_token 있으면 로그아웃 버튼 표시
+    // 로그인 상태 체크 : access_token 있으면 로그아웃 버튼 표시
     window.addEventListener('DOMContentLoaded', function () {
       const accessToken = localStorage.getItem('access_token');
-      const loginMenu = document.getElementById('login-menu'); // 햄버거 메뉴 속 로그인 회원가입
-      const logoutMenu = document.getElementById('logout-menu'); // 햄버거 안 로그아웃 메뉴
+      const loginMenu = document.getElementById('login-menu');
+      const logoutMenu = document.getElementById('logout-menu');
 
       if (accessToken) {
-        if(loginMenu) loginMenu.style.display = 'none'; // 로그인 시 햄버거 바 안 로그인, 회원가입 숨김
-        if(logoutMenu) logoutMenu.style.display = 'block';
+        if (loginMenu) loginMenu.style.display = 'none';
+        if (logoutMenu) logoutMenu.style.display = 'block';
       } else {
-        if(loginMenu) loginMenu.style.display = 'block'; // 비로그인 상태면 표시
-        if(logoutMenu) logoutMenu.style.display = 'none';
+        if (loginMenu) loginMenu.style.display = 'block';
+        if (logoutMenu) logoutMenu.style.display = 'none';
+      }
+
+      // 공통 모달 강제 노출 방지
+      const modal = document.getElementById("common-modal");
+      const message = document.getElementById("modal-message");
+      if (message.dataset.active === "true" && message.innerHTML.trim() !== "") {
+        modal.style.display = "flex";
+      } else {
+        modal.style.display = "none";
       }
     });
 
@@ -94,8 +131,6 @@
       window.location.href = "{% url 'trash_loc:home' %}";
     });
   </script>
-
-  <!-- Bootstrap JS Bundle (modal 포함) -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+

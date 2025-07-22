@@ -1,4 +1,4 @@
-from mongoengine import  FloatField, BooleanField, DecimalField, DictField, TextField
+from mongoengine import  FloatField, BooleanField, DecimalField, DictField, StringField
 from mongoengine import Document, StringField, DateTimeField, DateField
 from mongoengine import IntField, BinaryField, ReferenceField
 
@@ -92,7 +92,7 @@ class ChatHistory(Document):
     scenario_id = StringField(max_length=255)
     session_id = StringField(max_length=255)
     role = StringField(max_length=50)
-    content = TextField()
+    content = StringField(max_length=10000)  # 텍스트 길이에 따라 max_length 설정
     latitude = FloatField()
     longitude = FloatField()
     is_final = BooleanField(default=False)
