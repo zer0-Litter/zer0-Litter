@@ -3,12 +3,11 @@ from django.contrib.auth.models import AbstractUser
 
 # Create your models here.
 
-
 class Users(AbstractUser):
     # username = 아이디 (기본 제공)
     # password = 비밀번호 (기본 제공)
     name = models.CharField(max_length=100)  # 사용자 이름 (실명)
-    birth = models.DateField()
+    birth = models.DateField()  # 슈퍼 유저 필요하면 임시로 null, blank 허용으로 변경해야함 null=True, blank=True (슈퍼유저 생성 후 다시 변경할 것)
     gender = models.CharField(max_length=20)
     address = models.CharField(max_length=255)
     phone_number = models.CharField(max_length=20)
@@ -16,6 +15,13 @@ class Users(AbstractUser):
 
     class Meta:
         db_table = 'users'
+
+# --- 슈퍼유저 생성 완료 후에는 아래처럼 birth 필드에서 null=True, blank=True 옵션 제거 후
+# python manage.py makemigrations
+# python manage.py migrate
+# 명령어를 실행하여 필드를 다시 필수값으로 변경해주세요 ---
+# birth = models.DateField()
+
 
 
 from django.db import models
