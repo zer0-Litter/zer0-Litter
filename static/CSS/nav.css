@@ -5,7 +5,7 @@
   width: 480px;
   margin: 0 auto;
   border: 1px solid #ddd;
-  min-height: 100vh;
+  height: 100vh;
   box-shadow: 0 0 10px rgba(0,0,0,0.05);
   display: flex;
   flex-direction: column;
@@ -47,7 +47,7 @@
 }
 
 .side-menu.hidden {
-  display: none;
+  display: none !important;
 }
 
 .side-menu ul {
@@ -77,6 +77,19 @@
   cursor: pointer;
 }
 
+.bottom-nav {
+  position: sticky;
+  bottom: 0;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-around;
+  background: #f1f8e9;
+  padding: 0.5rem 0;
+  border-top: 1px solid #ccc;
+}
+
 /* 하단 네비게이션 a 기본는 normal, hover 시 굵게와 색상 변경 */
 .bottom-nav a {
   text-decoration: none;
@@ -94,8 +107,9 @@
 
 
 main {
-  flex-grow: 1;
-  padding: 1rem;
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
 }
 
 .bottom-nav {
@@ -112,4 +126,28 @@ main {
 .bottom-nav a {
   text-decoration: none;
   color: #333;
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.modal-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 5px;
+  font-weight: bold;
+}
+
+.modal-btn.cancel {
+  background-color: #ccc;
+  color: black;
+}
+
+.modal-btn.confirm {
+  background-color: red;
+  color: white;
 }

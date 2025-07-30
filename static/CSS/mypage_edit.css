@@ -1,16 +1,19 @@
+main {
+  display: flex;
+  justify-content: center;
+}
+
 .top-row {
 display: flex;
 align-items: center;
 margin-bottom: 20px;
 }
 
-/* 컨테이너 너비 늘리기 */
 .container {
-  max-width: 100%;
+  max-width: 480px;
   width: 100%;
-  max-width: 600px;  /* 기존 360px → 600px로 확장 */
-  padding: 10px;
-  font-family: 'Noto Sans KR', sans-serif;
+  margin: 0 auto;
+  padding: 0 20px;
 }
 
 h2 {
@@ -48,26 +51,48 @@ margin-top: 5px;
 }
 
 .btn-group {
-display: flex;
-justify-content: space-between;
-margin-top: 25px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 25px;
 }
 
 .btn-group button {
-flex: 1;
-padding: 12px;
-font-size: 16px;
-border-radius: 10px;
-border: none;
-cursor: pointer;
-font-weight: bold;
+  flex: 1;
+  padding: 12px;
+  font-size: 16px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
 }
+
+.btn-delete {
+  background-color: #e53935;
+  color: white;
+}
+
+.btn-delete.active-delete {
+  background-color: red;
+  color: white;
+}
+
 
 .btn-submit {
 background-color: #B0B0B0;
 color: white;
 box-shadlow: none;
 }
+
+.btn-submit.active {
+  background-color: #4CAF50 !important; /* 초록색 */
+  color: white;
+}
+
+.btn-submit:active {
+  filter: brightness(90%);
+}
+
 
 .modal-icon {
 font-size: 16px;
@@ -137,4 +162,18 @@ margin-top: 5px;
 #pw-check-result {
   font-size: 12px;
   margin-top: 5px;
+}
+
+.toggle-eye {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  font-size: 18px;
+  color: #555;
+}
+
+.input-wrapper {
+  position: relative;
 }

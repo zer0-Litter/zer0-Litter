@@ -1,76 +1,137 @@
 {% extends 'nav_base.html' %}
+{% load static %}
 {% block title %}마이페이지{% endblock %}
 
-{% block content %}
-  <h1>마이페이지</h1>
-
-  {% if user.is_authenticated %}
-    <a href="{% url 'accounts:mypage_edit' %}">회원정보 수정하기</a>
-  {% else %}
-    <a href="{% url 'accounts:login' %}?next={% url 'accounts:mypage_edit' %}">회원정보 수정하려면 로그인하세요</a>
-  {% endif %}
-
-  <!-- ✅ 민원 내역 테이블 -->
-  {% if complaints %}
-    <h2 style="margin-top: 30px;">📄 민원 내역</h2>
-    <table class="table table-bordered mt-3">
-      <thead>
-        <tr>
-          <th>제목</th>
-          <th>등록일</th>
-          <th>유형</th>
-          <th>위치</th>
-          <th>진행상황</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for c in complaints %}
-          <tr>
-            <td>{{ c.title }}</td>
-            <td>{{ c.date|date:"Y-m-d H:i" }}</td>
-            <td>{{ c.type }}</td>
-            <td>{{ c.location }}</td>
-            <td>{{ c.status }}</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p>등록된 민원이 없습니다.</p>
-  {% endif %}
-
-
-  <!-- 계정 탈퇴 버튼 -->
-  <form method="post" action="{% url 'accounts:delete_user' %}" onsubmit="return confirmDelete(event)">
-    {% csrf_token %}
-    <button type="submit" class="btn btn-danger">계정 탈퇴</button>
-  </form>
-
-  {% if messages %}
-    {% for message in messages %}
-      {% if message %}
-        <script>
-          window.addEventListener('DOMContentLoaded', () => {
-            showModal(`{{ message|escapejs }}`);
-          });
-        </script>
-      {% endif %}
-    {% endfor %}
-  {% endif %}
-
-
-  <script>
-    function confirmDelete(event) {
-      event.preventDefault();
-      showModal("정말로 계정을 삭제하시겠습니까?", null);
-
-      const confirmBtn = document.getElementById('modal-confirm-btn');
-      confirmBtn.onclick = () => {
-        event.target.submit();
-      };
-    }
-  </script>
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/mypage_home.css' %}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 {% endblock %}
+
+{% block content %}
+  <div class="mypage-container">
+    {% if user.is_authenticated %}
+      <!-- 프로필 정보 -->
+      <div class="profile-header">
+        <div class="profile-left">
+          <img src="{% static 'img/default_profile.png' %}" alt="프로필" class="profile-img">
+          <div class="profile-text">
+            <p class="username">{{ user.username }}</p>
+            <p class="greeting">회원님 반갑습니다!</p>
+          </div>
+        </div>
+        <button id="logout-btn" class="logout-button">로그아웃</button>
+      </div>
+    {% else %}
+      <!-- 비로그인 시 표시할 메시지 -->
+      <div class="profile-section">
+        <p class="greeting">로그인이 필요합니다.</p>
+      </div>
+    {% endif %}
+  </div>
+
+
+  <!-- 버튼 -->
+  <div class="top-buttons">
+    <a href="{% url 'accounts:complaint_all' %}" class="btn-box">
+      <img src="{% static 'img/icon_complaint.png' %}" alt="민원내역">
+      <span>민원 내역</span>
+    </a>
+    <a href="{% url 'accounts:mypage_edit' %}" class="btn-box">
+      <img src="{% static 'img/icon_info.png' %}" alt="회원정보">
+      <span>회원 정보</span>
+    </a>
+  </div>
+
+  <!-- 민원 목록 -->
+  <!-- 민원 목록 제목 + 추가 버튼 -->
+  <div class="complaint-title-bar">
+    <h2 class="section-title">내 민원 목록</h2>
+    <a href="{% url 'complain:complain_add' %}" class="add-complaint-btn">+ 민원 추가하기</a>
+  </div>
+
+
+
+  <ul class="complaint-list">
+    {% for c in complaints %}
+    {% with icon_path='img/icon_'|add:c.icon_type|add:'.png' %}
+    <li class="complaint-item">
+      <img src="{% static icon_path %}" class="complaint-icon" alt="{{ c.type }}">
+      <div class="complaint-text">
+        <div class="complaint-type">{{ c.type }}</div>
+        <div class="complaint-date">{{ c.date|date:"Y.m.d" }}</div>
+      </div>
+      <div class="complaint-status {{ c.status }}">{{ c.status }}</div>
+    </li>
+    {% endwith %}
+    {% endfor %}
+  </ul>
+
+
+
+
+    <!-- 민원 진행 통계 -->
+  <div class="section-title">민원 진행 사항</div>
+  <div class="status-boxes">
+    <div class="status-box">
+      <div class="status-label">총 민원 수</div>
+      <div class="status-count">{{ total_count }}</div>
+    </div>
+    <div class="status-box">
+      <div class="status-label">해결 완료</div>
+      <div class="status-count">{{ complete_count }}</div>
+    </div>
+    <div class="status-box">
+      <div class="status-label">대기 중</div>
+      <div class="status-count">{{ processing_count }}</div>
+    </div>
+  </div>
+
+
+</div>
+
+<!-- 모달 메시지 처리 -->
+{% if messages %}
+  {% for message in messages %}
+    {% if message %}
+      <script>
+        window.addEventListener('DOMContentLoaded', () => {
+          const msg = `{{ message|escapejs }}`;
+          if (msg && msg.trim() !== "") {
+            showModal(msg);
+          }
+        });
+      </script>
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+<script>
+  function confirmDelete(event) {
+    event.preventDefault();
+    showModal("정말로 계정을 삭제하시겠습니까?", null);
+
+    const confirmBtn = document.getElementById('modal-confirm-btn');
+    confirmBtn.onclick = () => {
+      event.target.submit();
+    };
+  }
+
+   document.getElementById('logout-btn')?.addEventListener('click', function (e) {
+    e.preventDefault();
+
+    fetch("{% url 'accounts:logout' %}", {
+      method: 'GET',
+      credentials: 'same-origin'
+    })
+    .finally(() => {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      window.location.href = "{% url 'accounts:login' %}";
+    });
+  });
+</script>
+{% endblock %}
+
 
 
 

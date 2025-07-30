@@ -21,6 +21,7 @@ app_name = 'accounts'
 
 urlpatterns = [
     path('login/', views.login, name='login'), #로그인 페이지
+    path('logout/', views.logout_view, name='logout'),
     path('check_user_id/',views.check_user_id, name='check_user_id'),
     path('check-password/', views.check_password_api, name='check_password'),
     path('login/submit/', views.LoginView.as_view(), name='login_view'), #로그인 처리
@@ -29,4 +30,5 @@ urlpatterns = [
     path('mypage/edit/', views.mypage_edit, name='mypage_edit'),
     path('mypage/update/', views.mypage_update, name='mypage_update'),
     path('delete/', views.delete_user, name='delete_user'),
+    path('complaint_all/', views.complaint_all_list, name='complaint_all'),
 ]

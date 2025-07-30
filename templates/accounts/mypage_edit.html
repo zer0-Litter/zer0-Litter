@@ -19,7 +19,7 @@
       </a>
     </div>
 
-    <form method="post" action="{% url 'accounts:mypage_update' %}" onsubmit="return validateForm()">
+    <form id="edit-form" method="post" action="{% url 'accounts:mypage_update' %}" onsubmit="return validateForm()">
       {% csrf_token %}
 
       <div class="input-block">
@@ -31,7 +31,7 @@
         <label>현재 비밀번호 확인 <span style="color:red;">*</span></label>
         <div class="input-wrapper">
           <input type="password" id="current_pw" name="current_password" required onblur="checkCurrentPassword()">
-          <button type="button" class="eye-btn" onclick="togglePassword('current_pw')">👁️</button>
+          <i class="fa-solid fa-eye toggle-eye" onclick="togglePassword('current_pw', this)"></i>
         </div>
         <div id="pw-check-result"></div>
       </div>
@@ -40,7 +40,7 @@
         <label>새 비밀번호 변경</label>
         <div class="input-wrapper">
           <input type="password" id="new_pw" name="password" placeholder="새 비밀번호 (선택)">
-          <button type="button" class="eye-btn" onclick="togglePassword('new_pw')">👁️</button>
+          <i class="fa-solid fa-eye toggle-eye" onclick="togglePassword('new_pw', this)"></i>
         </div>
       </div>
 
@@ -48,7 +48,7 @@
         <label>새 비밀번호 확인</label>
         <div class="input-wrapper">
           <input type="password" id="confirm_pw" name="password_confirm" placeholder="새 비밀번호 재입력">
-          <button type="button" class="eye-btn" onclick="togglePassword('confirm_pw')">👁️</button>
+          <i class="fa-solid fa-eye toggle-eye" onclick="togglePassword('confirm_pw', this)"></i>
         </div>
       </div>
 
@@ -63,8 +63,17 @@
       </div>
 
       <div class="btn-group">
+        <button type="submit"
+                class="btn-submit btn-delete"
+                formaction="{% url 'accounts:delete_user' %}"
+                formmethod="post"
+                onclick="return confirmDelete(event)">
+          계정 탈퇴
+        </button>
+
         <button type="submit" class="btn-submit">수정 완료</button>
       </div>
+
     </form>
   </div>
 {% else %}
@@ -98,10 +107,19 @@
     numericOnly: true
   });
 
-  function togglePassword(id) {
+  function togglePassword(id, icon) {
     const field = document.getElementById(id);
-    field.type = field.type === 'password' ? 'text' : 'password';
+    if (field.type === "password") {
+      field.type = "text";
+      icon.classList.remove("fa-eye");
+      icon.classList.add("fa-eye-slash");
+    } else {
+      field.type = "password";
+      icon.classList.remove("fa-eye-slash");
+      icon.classList.add("fa-eye");
+    }
   }
+
 
   function getCookie(name) {
     let cookieValue = null;
@@ -165,6 +183,50 @@
     }
     return true;
   }
+
+  // 입력값 변경되면 '수정 완료' 버튼 초록색으로
+  window.addEventListener("DOMContentLoaded", () => {
+    const form = document.getElementById("edit-form");
+    const inputs = form.querySelectorAll("input");
+    const submitBtn = form.querySelector("button.btn-submit:not(.btn-delete)");
+
+    const initialValues = {};
+    inputs.forEach(input => {
+      initialValues[input.name] = input.value;
+    });
+
+    inputs.forEach(input => {
+      input.addEventListener("input", () => {
+        const isModified = Array.from(inputs).some(i => i.value !== initialValues[i.name]);
+        if (isModified) {
+          submitBtn.classList.add("active");
+        } else {
+          submitBtn.classList.remove("active");
+        }
+      });
+    });
+  });
+
+  // 계정 탈퇴 버튼 클릭 시 빨간색 유지 (기본 동작)
+  function confirmDelete(event) {
+    event.preventDefault();
+
+    const deleteBtn = event.target;
+    deleteBtn.classList.add("active-delete");  // 빨간 강조
+
+    showModal(
+      "정말로 계정을 삭제하시겠습니까?",
+      // 확인 시
+      () => {
+        deleteBtn.closest('form').submit();
+      },
+      // 취소 시
+      () => {
+        deleteBtn.classList.remove("active-delete");
+      }
+    );
+  }
+
 </script>
 {% endblock %}
 

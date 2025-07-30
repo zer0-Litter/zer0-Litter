@@ -1,0 +1,224 @@
+main {
+  display: block !important;
+}
+
+.mypage-container {
+  width: 100%
+  max-width: 100%;
+  padding: 20px;
+  font-family: 'Noto Sans KR', sans-serif;
+  background-color: white;
+  word-break: keep-all;  /* 단어 잘림 방지 */
+}
+
+/* 프로필 영역 */
+
+/* 한 줄에 정렬된 상단 프로필 + 로그아웃 */
+.profile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.profile-left {
+  display: flex;
+  align-items: center;
+}
+
+.logout-button {
+  background-color: #d9f2dc;
+  color: #2e7d32;
+  border: none;
+  border-radius: 5px;
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.profile-img {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  margin-right: 15px;
+}
+
+.profile-text .username {
+  font-weight: bold;
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.profile-text .greeting {
+  color: gray;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+
+.logout-button:hover {
+  background-color: #c1eac4;
+}
+
+/* 상단 버튼 */
+.top-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 40px;
+}
+
+.btn-box {
+  width: 48%;
+  background-color: #f5f5f5;
+  border-radius: 12px;
+  padding: 15px 0;
+  text-align: center;
+  text-decoration: none;
+  color: black;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+
+.btn-box img {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 10px;
+}
+
+.btn-box span {
+  font-size: 1rem;
+  font-weight: bold;
+  display: block;
+  margin-top: 5px;
+}
+
+
+/* 민원 리스트 */
+.complaint-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  margin-bottom: 70px;
+}
+
+.complaint-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 10px;
+  background-color: #fff;
+  border-bottom: 1px solid #eee;
+}
+
+.complaint-icon {
+  width: 28px;
+  height: 28px;
+  margin-right: 10px;
+}
+
+.complaint-text {
+  flex-grow: 1;
+}
+
+.complaint-type {
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.complaint-date {
+  font-size: 0.75rem;
+  color: gray;
+}
+
+.complaint-status {
+  font-size: 0.85rem;
+  font-weight: bold;
+  border-radius: 15px;
+  padding: 4px 10px;
+}
+
+.완료 {
+  background-color: #d3d3d3;
+  color: black;
+}
+
+.처리중 {
+  background-color: #ffea91;
+  color: black;
+}
+
+.대기중 {
+  background-color: #f88;
+  color: white;
+}
+
+/* 민원 진행 사항 */
+.complaint-title-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 50px;
+  margin-bottom: 15px;
+  flex-wrap: nowrap;
+}
+
+.section-title {
+  font-size: 1rem;
+  font-weight: bold;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-grow: 0;
+}
+
+.add-complaint-btn {
+  background-color: black;
+  color: white;
+  font-size: 0.85rem;
+  padding: 6px 12px;
+  border-radius: 6px;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.status-boxes {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.status-box {
+  width: 30%;
+  background-color: #f5f5f5;
+  padding: 15px 5px;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.status-label {
+  font-size: 0.75rem;
+  color: gray;
+  margin-bottom: 5px;
+}
+
+.status-count {
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+
+
+
+
+
+
+
+
+

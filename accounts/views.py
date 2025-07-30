@@ -1,6 +1,9 @@
+from functools import wraps
+
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
+from django.views.decorators.http import require_GET
 from rest_framework.parsers import MultiPartParser,FormParser
 from common.models import Users
 from rest_framework.views import APIView
@@ -18,6 +21,8 @@ from django.contrib.auth import logout
 import json
 import re
 from common.models_mongo import Complaints, ComplaintStatus
+from bson import ObjectId
+from django.contrib.auth import logout as django_logout
 
 
 
@@ -94,6 +99,10 @@ class LoginView(APIView):
 def login(request):
     return render(request, 'accounts/login.html')
 
+@require_GET
+def logout_view(request):
+    django_logout(request)
+    return redirect('accounts:login')
 
 def mypage_edit(request): # 회원정보 수정 페이지를 보여줌
     user = request.user
@@ -164,26 +173,95 @@ def delete_user(request):
     else:
         return redirect('accounts:mypage_home')  # POST 아닌 경우 마이페이지로
 
+def login_required_with_modal(view_func):
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            # 로그인 필요 모달용 쿠키를 세팅한 뒤 리다이렉트
+            response = redirect('accounts:login')
+            response.set_cookie('show_login_required_modal', '1', max_age=10)
+            return response
+        return view_func(request, *args, **kwargs)
+    return _wrapped_view
 
-@login_required
+
+
+@require_GET
+@login_required_with_modal
 def mypage_home(request):
     username = request.user.username
-
-    # 로그인한 유저의 민원 리스트 가져오기
     user_complaints = Complaints.objects(user_id=username).order_by('-com_reg_date')
 
-    # 각 민원에 대응하는 상태 이름을 붙여줌
-    complaint_list = []
+    total_count = user_complaints.count()
+    complete_count = 0
+    processing_count = 0
+
     for complaint in user_complaints:
-        status = ComplaintStatus.objects(status_id=str(complaint.status_id)).first()
-        complaint_list.append({
+        try:
+            status = ComplaintStatus.objects(status_id=ObjectId(complaint.status_id)).first()
+            name = status.status_name if status else '처리중'
+        except Exception:
+            name = '처리중'
+
+        if name == '완료':
+            complete_count += 1
+        else:
+            processing_count += 1
+
+    recent_complaints = user_complaints[:3]
+    complaints_display = []
+
+    for complaint in recent_complaints:
+        try:
+            status = ComplaintStatus.objects(status_id=ObjectId(complaint.status_id)).first()
+            status_name = status.status_name if status else '처리중'
+        except Exception:
+            status_name = '처리중'
+
+        complaint_type = complaint.com_type
+        if isinstance(complaint_type, list):
+            icon_type = complaint_type[0]
+        else:
+            icon_type = complaint_type.split(',')[0].strip()
+
+        complaints_display.append({
+            'title': complaint.com_title,
+            'date': complaint.com_reg_date,
+            'type': complaint_type,
+            'location': complaint.com_location,
+            'status': status_name,
+            'icon_type': icon_type
+        })
+
+    return render(request, 'accounts/mypage_home.html', {
+        'complaints': complaints_display,
+        'total_count': total_count,
+        'complete_count': complete_count,
+        'processing_count': processing_count,
+    })
+
+
+@login_required
+def complaint_all_list(request):
+    username = request.user.username
+    user_complaints = Complaints.objects(user_id=username).order_by('-com_reg_date')
+
+    all_complaints = []
+    for complaint in user_complaints:
+        try:
+            status = ComplaintStatus.objects(status_id=ObjectId(complaint.status_id)).first()
+            status_name = status.status_name if status else '처리중'
+        except Exception:
+            status_name = '처리중'
+
+        all_complaints.append({
             'title': complaint.com_title,
             'date': complaint.com_reg_date,
             'type': complaint.com_type,
             'location': complaint.com_location,
-            'status': status.status_name if status else '알 수 없음'
+            'status': status_name
         })
 
-    return render(request, 'mypage_home.html', {
-        'complaints': complaint_list
+    return render(request, 'accounts/complaint_all_list.html', {
+        'complaints': all_complaints
     })
