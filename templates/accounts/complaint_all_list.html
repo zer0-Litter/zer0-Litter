@@ -1,0 +1,58 @@
+{% extends 'nav_base.html' %}
+{% load static %}
+
+{% block title %}민원 전체 목록{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'css/complaint_list.css' %}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+{% endblock %}
+
+
+{% block content %}
+<div class="container">
+  <a href="{% url 'accounts:mypage_home' %}" class="back-link">
+    <div class="title-row">
+      <i class="fa-solid fa-chevron-left"></i>
+      <span class="title-text">민원 전체 목록</span>
+    </div>
+  </a>
+  <p class="section-subtitle">최근 요청된 민원</p>
+
+  <ul class="complaint-list">
+    {% for c in complaints %}
+      {% with icon_path='img/icon_'|add:c.type.0|add:'.png' %}
+      <li class="complaint-item"
+          onclick="showComplaintDetailModal(this)"
+          data-type="{{ c.type|join:', ' }}"
+          data-date="{{ c.date|date:'Y-m-d' }}"
+          data-location="{{ c.location }}"
+          data-title="{{ c.title }}"
+          data-content="{{ c.contents }}"
+          data-re="{{ c.re_complain }}"
+          data-trashcan="{{ c.com_trashcan }}"
+          data-status="{{ c.status_name }}"
+          data-trash_type="{{ c.com_trash_type }}">
+        <div class="complaint-left">
+          <img src="{% static icon_path %}" class="icon" alt="아이콘">
+          <div class="complaint-info">
+            <p class="complaint-title">{{ c.type|join:", " }}</p>
+            <p class="complaint-date">{{ c.date|date:"Y-m-d" }}, {{ c.location }}</p>
+          </div>
+        </div>
+        <div class="complaint-action">
+          <a href="#" class="retry-btn" onclick="event.stopPropagation()">재민원넣기</a>
+        </div>
+      </li>
+      {% endwith %}
+    {% endfor %}
+  </ul>
+
+
+  <div class="add-btn-wrapper">
+    <a href="{% url 'complain:complain_add' %}" class="add-btn">민원 추가하기</a>
+  </div>
+</div>
+{% endblock %}
+
+

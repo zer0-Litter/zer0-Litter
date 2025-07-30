@@ -21,76 +21,163 @@
           <img src="{% static 'img/logo.png' %}" alt="zer0 Litter" />
         </a>
       </div>
-      <div style="display: flex; align-items: center;">
-
-          <button class="hamburger" onclick="toggleMenu()">☰</button>
-      </div>
     </header>
 
-    <!-- ✅ 햄버거 드롭다운 메뉴 -->
-    <nav id="sideMenu" class="side-menu hidden">
-      <ul>
-        <li id="login-menu"><a href="{% url 'accounts:login' %}" class="active">로그인/회원가입</a></li>
-        <li><a href="{% url 'trash_loc:home' %}">쓰레기통 위치</a></li>
-        <li><a href="{% url 'complain:complain_add' %}">민원</a></li>
-        <li><a href="{% url 'accounts:mypage_home' %}">마이페이지</a></li>
-        <li><a href="{% url 'dashboard:dashboard' %}">통계보기</a></li>
-        <!-- 로그아웃 메뉴 항목 추가 -->
-        <li id="logout-menu" style="display:none;">
-          <a href="#" id="logout-link">로그아웃</a>
-        </li>
-      </ul>
-    </nav>
 
     <!-- ✅ 본문 영역 -->
     <main>
-      {% block content %}
-      {% endblock %}
+      {% block content %}{% endblock %}
     </main>
 
     <!-- ✅ 하단 네비게이션 -->
     <footer class="bottom-nav">
       <a href="{% url 'trash_loc:home' %}">지도</a>
       <a href="{% url 'complain:complain_add' %}">민원</a>
-      <a href="{% url 'accounts:mypage_home' %}">my</a>
       {% if scenario_id %}
         <a href="{% url 'chatbot:chatbot_chat' scenario_id=scenario_id %}">챗봇</a>
       {% else %}
         <a href="{% url 'chatbot:chatbot_chat_default' %}">챗봇</a>
       {% endif %}
+      <a href="{% url 'dashboard:dashboard' %}">통계</a>
+      <a href="{% url 'accounts:mypage_home' %}">my</a>
     </footer>
   </div>
 
-  <!-- ✅ 메뉴 토글 스크립트 -->
+  <!-- 공통 모달 -->
+  <div id="common-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <p id="modal-message" data-active="false"></p>
+      <div class="modal-buttons">
+        <button id="modal-confirm-btn">확인</button>
+        <button id="modal-cancel-btn">취소</button>
+      </div>
+    </div>
+  </div>
+
+
+
+<!-- ✅ 스크립트 -->
   <script>
+    // 모달 열기 함수
+    function showModal(message, onConfirm = null, onCancel = null) {
+      const modal = document.getElementById('common-modal');
+      const messageBox = document.getElementById('modal-message');
+      const confirmBtn = document.getElementById('modal-confirm-btn');
+      const cancelBtn = document.getElementById('modal-cancel-btn');
+
+      if (!message || message.trim() === "") {
+        message = "알 수 없는 메시지입니다.";
+      }
+
+      messageBox.innerHTML = message;
+      messageBox.dataset.active = "true";
+      modal.style.display = 'flex';
+
+      if (confirmBtn && cancelBtn) {
+        confirmBtn.onclick = () => {
+          hideModal();
+          if (onConfirm) onConfirm();
+        };
+        cancelBtn.onclick = () => {
+          hideModal();
+          if (onCancel) onCancel();
+        };
+      }
+    }
+
+    function hideModal() {
+      document.getElementById('common-modal').style.display = 'none';
+      document.getElementById('modal-message').dataset.active = "false";
+    }
+
     function toggleMenu() {
       const menu = document.getElementById("sideMenu");
       menu.classList.toggle("hidden");
     }
 
-    // 로그인 상태 체크: access_token 있으면 로그아웃 버튼 표시
     window.addEventListener('DOMContentLoaded', function () {
       const accessToken = localStorage.getItem('access_token');
-      const loginMenu = document.getElementById('login-menu'); // 햄버거 메뉴 속 로그인 회원가입
-      const logoutMenu = document.getElementById('logout-menu'); // 햄버거 안 로그아웃 메뉴
+      const loginMenu = document.getElementById('login-menu');
+      const logoutMenu = document.getElementById('logout-menu');
+      const path = window.location.pathname;
 
+      // 로그인 상태에 따라 메뉴 표시
       if (accessToken) {
-        if(loginMenu) loginMenu.style.display = 'none'; // 로그인 시 햄버거 바 안 로그인, 회원가입 숨김
-        if(logoutMenu) logoutMenu.style.display = 'block';
+        if (loginMenu) loginMenu.style.display = 'none';
+        if (logoutMenu) logoutMenu.style.display = 'block';
       } else {
-        if(loginMenu) loginMenu.style.display = 'block'; // 비로그인 상태면 표시
-        if(logoutMenu) logoutMenu.style.display = 'none';
+        if (loginMenu) loginMenu.style.display = 'block';
+        if (logoutMenu) logoutMenu.style.display = 'none';
+
+        if (path.includes("/mypage") || path.includes("/complaint_all_list")) {
+          showModal("로그인이 필요합니다!", () => {
+            window.location.href = "{% url 'accounts:login' %}";
+          });
+          return;
+        }
+      }
+
+      // 쿠키 기반 로그인 필요 모달
+      const cookies = document.cookie.split(';').map(c => c.trim());
+      const loginCookie = cookies.find(c => c.startsWith("show_login_required_modal="));
+      if (loginCookie && loginCookie.endsWith("1")) {
+        setTimeout(() => {
+          showModal("로그인이 필요합니다!");
+          setTimeout(() => {
+            document.cookie = "show_login_required_modal=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+          }, 500);
+        }, 200);
       }
     });
 
-    // 로그아웃 버튼 클릭 시
+    // 로그아웃 처리
     document.getElementById('logout-link')?.addEventListener('click', function (e) {
       e.preventDefault();
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      alert("로그아웃 되었습니다.");
-      window.location.href = "{% url 'trash_loc:home' %}";
+
+      // 1) 서버 세션 로그아웃 호출
+      fetch("{% url 'accounts:logout' %}", {
+        method: 'GET',
+        credentials: 'same-origin'
+      })
+      .finally(() => {
+        // 2) 로컬스토리지 토큰 제거
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        // 3) 로그인 화면으로 이동
+        window.location.href = "{% url 'accounts:login' %}";
+      });
     });
+
+    // 민원 상세 모달
+    function showComplaintDetailModal(el) {
+      const type = el.dataset.type;
+      const date = el.dataset.date;
+      const location = el.dataset.location;
+      const title = el.dataset.title;
+      const contents = el.dataset.content;
+      const re = el.dataset.re;
+      const trashcan = el.dataset.trashcan;
+      const status = el.dataset.status;
+      const trashType = el.dataset.trash_type;
+
+      const message = `
+        <div style="text-align: left;">
+          <strong>제목:</strong> ${title}<br>
+          <strong>민원 종류:</strong> ${type}<br>
+          <strong>날짜:</strong> ${date}<br>
+          <strong>주소:</strong> ${location}<br>
+          <strong>처리 상태:</strong> ${status}<br>
+          <strong>쓰레기통 종류:</strong> ${trashType}<br>
+          <strong>관련 쓰레기통:</strong> ${trashcan}<br>
+          <strong>내용:</strong><br>${contents}<br>
+          <strong>재민원 내용:</strong><br>${re || '없음'}
+        </div>
+      `;
+      showModal(message);
+    }
   </script>
+
+ {% block extra_script %}{% endblock %}
 </body>
 </html>
+

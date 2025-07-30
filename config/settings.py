@@ -101,8 +101,18 @@ DATABASES = {
 
 load_dotenv()
 
+from mongoengine import connect
+
+# 이미 설정된 환경 변수
 MONGO_DB_NAME = "complaints_db"
 MONGO_URI = os.getenv("MONGO_URI")
+
+# ✅ MongoEngine 연결 설정 (alias='default' 명시)
+connect(
+    db=MONGO_DB_NAME,
+    host=MONGO_URI,
+    alias='default'
+)
 
 mongo_client = MongoClient(MONGO_URI)
 mongo_db = mongo_client[MONGO_DB_NAME]
@@ -153,7 +163,6 @@ USE_TZ = True
 
 # 배포 시 수정 해야 함.
 STATIC_URL = '/static/'
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
@@ -194,3 +203,6 @@ LOGGING = {
 INTERNAL_IPS = [
     '127.0.0.1',  # 로컬 환경 에서만 툴바가 뜨도록
 ]
+
+LOGIN_URL = '/accounts/login/'  # 로그인하지 않았을 때 이동할 로그인 페이지
+LOGIN_REDIRECT_URL = '/trach_loc/home/'  # 로그인 후 이동할 기본 페이지

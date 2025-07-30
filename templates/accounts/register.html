@@ -12,6 +12,7 @@
 
     <form method="POST" action="{% url 'accounts:register' %}" id="register-form">
         {% csrf_token %}
+
         <div class="form-group id-group">
             <label for="username">아이디</label>
             <div class="id-input-wrap">
@@ -112,105 +113,99 @@
               <a href="{% url 'accounts:login' %}" class="back-btn">이전으로</a>
           </div>
     </form>
-
-  <!-- 모달창 -->
-  <div id="modal" class="modal" style="display: none;">
-    <div class="modal-content">
-      <span id="close-btn" style="cursor: pointer;">&times;</span>
-      <h3 id="modal-message"></h3>
-    </div>
-  </div>
 </div>
 
+{% if messages %}
+  {% for message in messages %}
+    {% if message %}
+      <script>
+        window.addEventListener('DOMContentLoaded', () => {
+          showModal(`{{ message|escapejs }}`);
+        });
+      </script>
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+
 <script>
-document.getElementById('check-duplicate-btn').addEventListener('click', function () {
-    const username = document.getElementById('username').value;
-    fetch("{% url 'accounts:check_user_id' %}", {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-        },
-        body: JSON.stringify({ username: username })
-    })
-    .then(response => response.json())
-    .then(data => {
-        const status = document.getElementById('duplicate-status');
-        if (data.is_taken) {
-            status.textContent = '아이디가 이미 존재합니다.';
-            status.style.color = 'red';
-        } else {
-            status.textContent = '사용 가능한 아이디입니다.';
-            status.style.color = 'green';
-        }
-    })
-    .catch(() => {
-        document.getElementById('duplicate-status').textContent = '오류 발생';
-    });
-});
-
-document.getElementById('register-form').addEventListener('submit', function (event) {
-    event.preventDefault();
-    const formData = new FormData(event.target);
-    fetch("{% url 'accounts:register' %}", {
-        method: 'POST',
-        body: formData
-    })
-    .then(response =>
-        response.json().then(data => ({
-            status: response.status,
-            body: data
-        }))
-    )
-    .then(({ status, body }) => {
-        const modal = document.getElementById('modal');
-        const messageBox = document.getElementById('modal-message');
-        if (status === 201) {
-            messageBox.innerHTML = `${body.username} 가입해주셔서 감사합니다.`;
-            modal.style.display = 'block';
-            setTimeout(() => {
-                window.location.href = "{% url 'accounts:login' %}";
-            }, 2000);
-        } else {
-            let errors = '';
-            for (const key in body) {
-                if (Array.isArray(body[key])) {
-                    errors += body[key].join('<br>') + '<br>';
-                } else {
-                    errors += body[key] + '<br>';
-                }
+    document.getElementById('check-duplicate-btn').addEventListener('click', function () {
+        const username = document.getElementById('username').value;
+        fetch("{% url 'accounts:check_user_id' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({ username: username })
+        })
+        .then(response => response.json())
+        .then(data => {
+            const status = document.getElementById('duplicate-status');
+            if (data.is_taken) {
+                status.textContent = '아이디가 이미 존재합니다.';
+                status.style.color = 'red';
+            } else {
+                status.textContent = '사용 가능한 아이디입니다.';
+                status.style.color = 'green';
             }
-            messageBox.innerHTML = errors;
-            modal.style.display = 'block';
-        }
-    })
-    .catch(() => {
-        document.getElementById('modal-message').textContent = '가입 중 오류 발생';
-        document.getElementById('modal').style.display = 'block';
+        })
+        .catch(() => {
+            document.getElementById('duplicate-status').textContent = '오류 발생';
+        });
     });
-});
 
-document.getElementById('close-btn').addEventListener('click', function () {
-    document.getElementById('modal').style.display = 'none';
-});
+    document.getElementById('register-form').addEventListener('submit', function (event) {
+        event.preventDefault();
+        const formData = new FormData(event.target);
 
-function formatPhoneNumber(input) {
-    let numbers = input.value.replace(/\D/g, '');
-    let formatted = '';
+        fetch("{% url 'accounts:register' %}", {
+            method: 'POST',
+            body: formData
+        })
+        .then(response =>
+            response.json().then(data => ({
+                status: response.status,
+                body: data
+            }))
+        )
+        .then(({ status, body }) => {
+            if (status === 201) {
+                showModal(`${body.username}님 가입을 환영합니다!<br>로그인 후 다양한 서비스를 이용해보세요.`, "{% url 'accounts:login' %}", 2000);
+            } else {
+                let errors = '';
+                for (const key in body) {
+                    if (Array.isArray(body[key])) {
+                        errors += body[key].join('<br>') + '<br>';
+                    } else {
+                        errors += body[key] + '<br>';
+                    }
+                }
+                showModal(errors);
+            }
+        })
+        .catch(() => {
+            showModal("가입 중 오류 발생");
+        });
+    });
 
-    if (numbers.length < 4) {
-      formatted = numbers;
-    } else if (numbers.length < 7) {
-      formatted = numbers.slice(0, 3) + '-' + numbers.slice(3);
-    } else if (numbers.length <= 10) {
-      formatted = numbers.slice(0, 3) + '-' + numbers.slice(3, 6) + '-' + numbers.slice(6);
-    } else {
-      formatted = numbers.slice(0, 3) + '-' + numbers.slice(3, 7) + '-' + numbers.slice(7, 11);
+    function formatPhoneNumber(input) {
+        let numbers = input.value.replace(/\D/g, '');
+        let formatted = '';
+
+        if (numbers.length < 4) {
+            formatted = numbers;
+        } else if (numbers.length < 7) {
+            formatted = numbers.slice(0, 3) + '-' + numbers.slice(3);
+        } else if (numbers.length <= 10) {
+            formatted = numbers.slice(0, 3) + '-' + numbers.slice(3, 6) + '-' + numbers.slice(6);
+        } else {
+            formatted = numbers.slice(0, 3) + '-' + numbers.slice(3, 7) + '-' + numbers.slice(7, 11);
+        }
+
+        input.value = formatted;
     }
-
-    input.value = formatted;
-  }
 </script>
+
+
 {% endblock %}
-
-

@@ -9,74 +9,66 @@
 
 {% block content %}
 <div class="login-container">
-  <h1 class="login-title">Log In</h1>
+  <img src="{% static 'img/logo.png' %}" alt="zer0 Litter 로고" class="login-logo">
 
   <form method="POST" action="{% url 'accounts:login_view' %}" id="login-form">
     {% csrf_token %}
-
     <div class="input-wrapper">
-      <input type="text" id="username" name="username" class="login-input" required placeholder="아이디" />
-      <input type="password" id="password" name="password" class="login-input" required placeholder="비밀번호" />
+      <input type="text" name="username" class="login-input" required placeholder="아이디" />
+      <input type="password" name="password" class="login-input" required placeholder="비밀번호" />
     </div>
 
-    <div class="login-buttons">
+    <div class="login-button-wrapper">
       <button type="submit" class="login-btn">로그인</button>
-      <a href="{% url 'accounts:register' %}" class="signup-btn">회원가입</a>
+      <div class="signup-wrapper">
+        <a href="{% url 'accounts:register' %}" class="signup-btn">회원가입</a>
+      </div>
     </div>
   </form>
-
-  <p class="login-bottom-link">
-    회원가입이 아직 안되셨나요? <a href="{% url 'accounts:register' %}">회원가입</a>
-  </p>
 </div>
+{% endblock %}
 
-<!-- 모달창 -->
-<div class="modal-overlay" id="modal" style="display: none;">
-  <div class="modal-content">
-    <button class="modal-close" onclick="closeModal()">×</button>
-    <h2 id="modal-message">환영합니다</h2>
-    <button class="modal-button" onclick="closeModal()">닫기</button>
-  </div>
-</div>
-
+{% block extra_script %}
 <script>
-  function closeModal() {
-    document.getElementById('modal').style.display = 'none';
-  }
-
-  document.getElementById('login-form').addEventListener('submit', function(event) {
+  // 로그인 비동기 처리
+  const form = document.getElementById('login-form');
+  form.addEventListener('submit', function(event) {
     event.preventDefault();
-    const formData = new FormData(event.target);
-
+    const formData = new FormData(form);
     fetch("{% url 'accounts:login_view' %}", {
       method: 'POST',
       body: formData
     })
     .then(response => response.json())
     .then(data => {
-      const modal = document.getElementById('modal');
-      const modalMessage = document.getElementById('modal-message');
-
-      modalMessage.textContent = data.message || '로그인 성공!';
-      modal.style.display = 'flex';
-
       if (data.access) {
         localStorage.setItem('access_token', data.access);
         localStorage.setItem('refresh_token', data.refresh);
-        setTimeout(function() {
-          window.location.href = "/";
-        }, 2000);
+        window.location.href = '/';
+      } else {
+        showModal(data.message || '로그인 실패');
       }
     })
-    .catch(error => {
-      const modal = document.getElementById('modal');
-      const modalMessage = document.getElementById('modal-message');
-
-      modalMessage.textContent = '로그인 중 오류가 발생했습니다.';
-      modal.style.display = 'flex';
+    .catch(() => {
+      showModal('로그인 중 오류가 발생했습니다.');
     });
   });
+
+  // 로그인 필요 시 쿠키 기반 모달 표시
+  const cookies = document.cookie.split(';').map(c => c.trim());
+  const loginCookie = cookies.find(c => c.startsWith("show_login_required_modal="));
+  if (loginCookie && loginCookie.endsWith("1")) {
+    setTimeout(() => {
+      if (typeof showModal === 'function') {
+        showModal("로그인이 필요합니다!");
+      } else {
+        alert("로그인이 필요합니다! (모달 함수 없음)");
+      }
+    }, 200);
+    document.cookie = "show_login_required_modal=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+  }
 </script>
 {% endblock %}
+
 
 

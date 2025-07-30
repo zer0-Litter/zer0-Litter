@@ -9,18 +9,16 @@ body {
 }
 
 .login-container {
-  margin-top: 120px;
+  margin-top: 40px;
   width: 100%;
   text-align: center;
 }
 
-.login-title {
-  font-size: 40px;
-  color: #5cb85c;
-  font-weight: bold;
-  text-shadow: 2px 2px #c1eac1;
-  margin-bottom: 30px;
+.login-logo {
+  width: 150px;
+  margin-bottom: 40px;
 }
+
 
 .input-wrapper {
   display: flex;
@@ -29,56 +27,67 @@ body {
 }
 
 .login-input {
-  width: 250px;
-  padding: 15px;
-  font-size: 18px;
-  border: none;
-  border-radius: 40px;
-  background: #fff;
-  box-shadow: 5px 5px 0px #cdecc9;
-  font-weight: bold;
-  text-align: center;
-  margin-bottom: 15px;
-}
-
-.login-buttons {
-  margin-top: 20px;
-  display: flex;
-  justify-content: center;
-  gap: 15px;
-}
-
-.login-btn,
-.signup-btn {
-  padding: 12px 25px;
+  width: 80%;
+  max-width: 280px;
+  padding: 12px;
   font-size: 16px;
-  font-weight: bold;
   border: none;
-  border-radius: 20px;
-  background-color: #d7eaff;
-  box-shadow: 3px 3px 0px #9bbfd8;
+  border-bottom: 2px solid #ccc;
+  background: transparent;
+  text-align: left;
+  margin-bottom: 20px;
+  outline: none;
+}
+
+.login-input:focus {
+  border-bottom: 2px solid #5c73f2;
+}
+
+
+.login-btn {
+  width: 80%;
+  max-width: 280px;
+  padding: 12px;
+  font-size: 16px;
+  border: none;
+  border-radius: 6px;
+  background-color: #cce5cc;  /* 연초록 */
+  color: #2e7d32;             /* 초록 텍스트 */
+  font-weight: bold;
   cursor: pointer;
-  color: black;
-  text-decoration: none;
 }
 
-.login-btn:hover,
-.signup-btn:hover {
-  background-color: #aacbe2;
+.login-btn:hover {
+  background-color: #b2dab5;
 }
 
-.login-bottom-link {
-  margin-top: 30px;
+
+.login-button-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.signup-wrapper {
+  width: 100%;
+  max-width: 280px;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.signup-btn {
   font-size: 14px;
-}
-
-.login-bottom-link a {
-  color: #007bff;
+  color: #2e7d32;
   text-decoration: none;
 }
-.login-bottom-link a:hover {
+
+.signup-btn:hover {
   text-decoration: underline;
 }
+
+
 
 /* 모달 영역 */
 .modal-overlay {

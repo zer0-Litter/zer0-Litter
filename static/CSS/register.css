@@ -152,14 +152,3 @@ select {
   display: inline-block;
 }
 
-.modal {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: white;
-  border: 1px solid #aaa;
-  border-radius: 10px;
-  padding: 20px;
-  z-index: 999;
-}
