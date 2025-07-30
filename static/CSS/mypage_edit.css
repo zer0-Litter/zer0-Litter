@@ -68,14 +68,17 @@ margin-top: 5px;
 }
 
 .btn-delete {
+  background-color: #B0B0B0;  /* 기본색 회색으로 변경 */
+  color: white;
+  transition: background-color 0.2s ease;
+}
+
+/* 마우스 올렸을 때 빨간색 */
+.btn-delete:hover {
   background-color: #e53935;
   color: white;
 }
 
-.btn-delete.active-delete {
-  background-color: red;
-  color: white;
-}
 
 
 .btn-submit {
