@@ -9,8 +9,6 @@
 {% block title %}회원정보 수정{% endblock %}
 
 {% block content %}
-{% if user.is_authenticated %}
-  <!-- 로그인한 경우: 기존 회원정보 수정 폼 그대로 보여줌 -->
   <div class="container">
     <div class="top-row">
       <a href="{% url 'accounts:mypage_home' %}" class="back-link">
@@ -30,7 +28,7 @@
       <div class="form-group">
         <label>현재 비밀번호 확인 <span style="color:red;">*</span></label>
         <div class="input-wrapper">
-          <input type="password" id="current_pw" name="current_password" required onblur="checkCurrentPassword()">
+          <input type="password" id="current_pw" name="current_password" onblur="checkCurrentPassword()">
           <i class="fa-solid fa-eye toggle-eye" onclick="togglePassword('current_pw', this)"></i>
         </div>
         <div id="pw-check-result"></div>
@@ -76,14 +74,6 @@
 
     </form>
   </div>
-{% else %}
-  <!-- 로그인하지 않은 경우: 로그인 유도 메시지 -->
-  <div class="container" >
-    <h2>로그인이 필요합니다</h2>
-    <p>회원정보를 수정하려면 로그인이 필요합니다.</p>
-    <a href="{% url 'accounts:login' %}?next={% url 'accounts:mypage_edit' %}" class="btn btn-primary">로그인하러 가기</a>
-  </div>
-{% endif %}
 
 {% if messages %}
   {% for message in messages %}
@@ -212,22 +202,64 @@
     event.preventDefault();
 
     const deleteBtn = event.target;
-    deleteBtn.classList.add("active-delete");  // 빨간 강조
 
     showModal(
       "정말로 계정을 삭제하시겠습니까?",
-      // 확인 시
       () => {
-        deleteBtn.closest('form').submit();
+        const form = deleteBtn.closest("form");
+        const formData = new FormData(form);
+        const csrfToken = getCookie("csrftoken");
+
+        fetch("{% url 'accounts:delete_user' %}", {
+          method: "POST",
+          headers: { "X-CSRFToken": csrfToken },
+          body: formData
+        })
+        .then(response => {
+          if (response.redirected) {
+            window.location.href = response.url;
+          } else {
+            return response.text().then(text => {
+              showModal("탈퇴에 실패했습니다.");
+              console.error(text);
+            });
+          }
+        })
+        .catch(error => {
+          console.error("탈퇴 중 오류 발생:", error);
+          showModal("탈퇴 중 오류가 발생했습니다.");
+        });
       },
-      // 취소 시
       () => {
-        deleteBtn.classList.remove("active-delete");
+        // 취소 시 더 이상 스타일 변경 없음
       }
     );
   }
 
+
+
 </script>
 {% endblock %}
+
+{% block extra_script %}
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const cookies = document.cookie.split(';').map(c => c.trim());
+    const pwCookie = cookies.find(c => c.startsWith('show_password_changed_modal='));
+    if (pwCookie && pwCookie.endsWith('1')) {
+      // 쿠키 삭제(반복 방지)
+      document.cookie = 'show_password_changed_modal=; max-age=0; path=/';
+
+      // 공통 모달 띄우기
+      setTimeout(() => {
+        showModal('비밀번호가 수정되었습니다. 재로그인 해주세요', () => {
+          window.location.href = "{% url 'accounts:login' %}";
+        });
+      }, 100);
+    }
+  });
+</script>
+{% endblock %}
+
 
 

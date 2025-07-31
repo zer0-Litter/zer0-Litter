@@ -26,6 +26,19 @@
     </div>
   </form>
 </div>
+
+{% if messages %}
+  {% for message in messages %}
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        showModal(`{{ message|escapejs }}`);
+      });
+    </script>
+  {% endfor %}
+{% endif %}
+
+
+
 {% endblock %}
 
 {% block extra_script %}
@@ -67,6 +80,17 @@
     }, 200);
     document.cookie = "show_login_required_modal=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
   }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const cookies = document.cookie.split(';').map(c => c.trim());
+    const deletedCookie = cookies.find(c => c.startsWith("show_account_deleted_modal="));
+    if (deletedCookie && deletedCookie.endsWith("1")) {
+      showModal("계정이 성공적으로 삭제되었습니다.");
+      // 쿠키 제거 (재방지)
+      document.cookie = "show_account_deleted_modal=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    }
+  });
+
 </script>
 {% endblock %}
 
