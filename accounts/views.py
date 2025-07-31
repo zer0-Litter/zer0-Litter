@@ -45,6 +45,7 @@ class RegisterView(APIView):
 
         return JsonResponse(serializer.errors, status=400)
 
+
 @csrf_exempt
 def check_user_id(request):
     if request.method == 'POST':
@@ -52,6 +53,7 @@ def check_user_id(request):
         username = data.get('username')
         is_taken = Users.objects.filter(username=username).exists()
         return JsonResponse({'is_taken':is_taken})
+
 
 @csrf_exempt
 def check_password_api(request):
@@ -99,14 +101,26 @@ class LoginView(APIView):
 def login(request):
     return render(request, 'accounts/login.html')
 
+
 @require_GET
 def logout_view(request):
     django_logout(request)
     return redirect('accounts:login')
 
+
 def mypage_edit(request): # 회원정보 수정 페이지를 보여줌
     user = request.user
     return render(request, 'accounts/mypage_edit.html', {'user':user})
+
+
+def is_valid_password(password):
+    if len(password) < 8:
+        return False
+    if not re.search(r'[0-9]', password):
+        return False
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        return False
+    return True
 
 
 @csrf_protect
@@ -133,6 +147,14 @@ def mypage_update(request):
 
     # 비밀번호 변경 요청이 있을 때
     if new_pw:
+        if not user.check_password(current):
+            messages.error(request, '현재 비밀번호가 일치하지 않습니다.')
+            return redirect('accounts:mypage_edit')
+
+        if not is_valid_password(new_pw):
+            messages.error(request, '비밀번호는 8자리 이상이며 숫자와 특수문자를 포함해야 합니다.')
+            return redirect('accounts:mypage_edit')
+
         user.set_password(new_pw)
         user.phone_number = phone
         user.address = address
@@ -163,6 +185,7 @@ def mypage_update(request):
 
     return redirect('accounts:mypage_home')
 
+
 @csrf_protect
 @login_required
 def delete_user(request):
@@ -179,6 +202,7 @@ def delete_user(request):
     else:
         return redirect('accounts:mypage_home')  # POST 아닌 경우 마이페이지로
 
+
 def login_required_with_modal(view_func):
     @wraps(view_func)
     def _wrapped_view(request, *args, **kwargs):
@@ -189,7 +213,6 @@ def login_required_with_modal(view_func):
             return response
         return view_func(request, *args, **kwargs)
     return _wrapped_view
-
 
 
 @require_GET
