@@ -23,4 +23,5 @@ app_name = 'chatbot'
 urlpatterns = [
     path('<int:scenario_id>/chatbot_chat/', views.chatbot_chat, name='chatbot_chat'), #시나리오 있을 때
     path('chatbot_chat_default/', views.chatbot_chat_default, name='chatbot_chat_default'), # 없을 때
+    path('chatbot_api/', views.chatbot_api, name='chatbot_api'),
 ]

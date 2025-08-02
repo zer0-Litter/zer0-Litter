@@ -1,4 +1,3 @@
-<!-- chatbot.html -->
 {% extends 'nav_base.html' %}
 {% load static %}
 
@@ -10,7 +9,6 @@
 
 {% block content %}
 <div class="chatbot-container">
-  <!-- 시나리오 선택 버튼 -->
   <div class="scenario-buttons">
     <button class="scenario-btn" onclick="startScenario('trash_finder')">
       🗑️ 쓰레기통 찾기
@@ -20,9 +18,7 @@
     </button>
   </div>
 
-  <!-- 채팅창 -->
   <div class="chat-window" id="chatWindow">
-    <!-- 메시지 예시 -->
     <div class="chat-message assistant">
       <div class="message-bubble">
         <span class="icon">🤖</span>
@@ -43,7 +39,6 @@
     </div>
   </div>
 
-  <!-- 메시지 입력 -->
   <form class="chat-input" id="chatForm" method="post" enctype="multipart/form-data" onsubmit="return sendMessage()">
     {% csrf_token %}
     <input type="text" name="message" id="messageInput" placeholder="메시지를 입력하세요..." autocomplete="off" />
@@ -54,6 +49,24 @@
 </div>
 
 <script>
+// CSRF 토큰 가져오는 함수
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+      cookie = cookie.trim();
+      if (cookie.startsWith(name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+const csrftoken = getCookie('csrftoken');
+
 function startScenario(scenarioId) {
   appendMessage('assistant', `시나리오 "${scenarioId}"를 시작합니다.`);
   // TODO: 서버 요청으로 시나리오 초기화 가능
@@ -94,6 +107,7 @@ function sendMessage() {
   appendMessage('user', message);
   input.value = '';
 
+  // 간단한 인사말 처리 (서버 요청 전)
   const lowerMsg = message.toLowerCase();
   const greetingResponses = {
     '안녕': '안녕하세요! 무엇을 도와드릴까요?',
@@ -113,10 +127,35 @@ function sendMessage() {
     }
   }
 
-  // TODO: 서버에 메시지 전송하고 응답 처리
+  // 서버로 메시지 전송 (AJAX)
+  const data = new FormData();
+  data.append('message', message);
+  data.append('user_id', 'web_user');  // 실제 로그인 유저 id로 변경 권장
+  data.append('session_id', 'web-session');  // 실제 UUID로 변경 권장
+  data.append('scenario_id', 'complain_submit');  // 또는 'trash_finder' 등
+
+  fetch('/chat/api/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': csrftoken
+    },
+    body: data
+  })
+  .then(response => response.json())
+  .then(json => {
+    if(json.response) {
+      appendMessage('assistant', json.response);
+    } else if(json.error) {
+      appendMessage('assistant', `오류: ${json.error}`);
+    }
+  })
+  .catch(err => {
+    appendMessage('assistant', '서버와 통신 중 오류가 발생했습니다.');
+    console.error(err);
+  });
+
   return false;
 }
-
 
 function uploadFile() {
   const fileInput = document.getElementById('fileUpload');
@@ -129,7 +168,7 @@ function uploadFile() {
   };
   reader.readAsDataURL(file);
 
-  // TODO: FormData를 이용해 서버에 전송 처리
+  // TODO: FormData를 이용해 서버에 이미지 전송 처리
 }
 </script>
 {% endblock %}
