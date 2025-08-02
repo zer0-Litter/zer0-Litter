@@ -1,26 +1,45 @@
 from django.http import JsonResponse
 from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+from .chatbot_core import chatbot_router, generate_session_id
+from common.models import Users
 
-from chatbot.chatbot_core import chatbot_router
 
+@login_required
+def chatbot_view(request):
+    print(f"[DEBUG] 인증 여부: {request.user.is_authenticated}, 사용자: {request.user}")
 
 def chatbot_chat_default(request):
     # 시나리오 ID 없이 접속하는 기본 챗봇 페이지
     return render(request, 'chatbot/chatbot_chat_default.html')
 
+
 @csrf_exempt
 def chatbot_api(request):
     if request.method == 'POST':
-        user_input = request.POST.get('message', '')
-        username = request.POST.get('username', 'web_user')  # username 기본값 설정
-        session_id = request.POST.get('session_id', None)
-        scenario_id = request.POST.get('scenario_id', None)
+        if not request.user.is_authenticated:
+            return JsonResponse({'error': '로그인이 필요합니다.'}, status=401)
 
-        # 내부 함수는 user_id 인자로 username을 넘겨줌
+        username = request.user.username
+        session_id = request.POST.get('session_id', 'web-session')
+        scenario_id = request.POST.get('scenario_id', None)
+        user_input = request.POST.get('message', '')
+
+        if not user_input:
+            return JsonResponse({'error': '메시지가 비어 있습니다.'}, status=400)
+
+        # 사용자 유효성 검사
+        try:
+            Users.objects.get(username=username)
+        except Users.DoesNotExist:
+            return JsonResponse({"error": "사용자 정보를 찾을 수 없습니다."}, status=404)
+
         bot_response = chatbot_router(user_input, user_id=username, session_id=session_id, scenario_id=scenario_id)
         return JsonResponse({'response': bot_response})
-    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+    return JsonResponse({'error': 'POST 요청만 허용됩니다.'}, status=405)
 
 
 def chatbot_chat(request, scenario_id):

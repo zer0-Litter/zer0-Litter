@@ -130,11 +130,10 @@ function sendMessage() {
   // 서버로 메시지 전송 (AJAX)
   const data = new FormData();
   data.append('message', message);
-  data.append('user_id', 'web_user');  // 실제 로그인 유저 id로 변경 권장
   data.append('session_id', 'web-session');  // 실제 UUID로 변경 권장
   data.append('scenario_id', 'complain_submit');  // 또는 'trash_finder' 등
 
-  fetch('/chat/api/', {
+  fetch('/chatbot/chatbot_api/', {
     method: 'POST',
     headers: {
       'X-CSRFToken': csrftoken
