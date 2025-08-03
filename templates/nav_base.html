@@ -147,13 +147,13 @@
 
 <!-- ✅ 스크립트 -->
   <script>
-    // 모달 열기 함수
+    // 공통 모달 열기 함수 (확인만 or 확인+취소 모두 지원)
     function showModal(message, onConfirm = null, onCancel = null) {
       const modal = document.getElementById('common-modal');
       const messageBox = document.getElementById('modal-message');
       const confirmBtn = document.getElementById('modal-confirm-btn');
       const cancelBtn = document.getElementById('modal-cancel-btn');
-
+    
       if (!message || message.trim() === "") {
         message = "알 수 없는 메시지입니다.";
       }
@@ -162,15 +162,22 @@
       messageBox.dataset.active = "true";
       modal.style.display = 'flex';
 
-      if (confirmBtn && cancelBtn) {
-        confirmBtn.onclick = () => {
-          hideModal();
-          if (onConfirm) onConfirm();
-        };
-        cancelBtn.onclick = () => {
-          hideModal();
-          if (onCancel) onCancel();
-        };
+      // 버튼 핸들러 설정
+      confirmBtn.onclick = () => {
+        hideModal();
+        if (onConfirm) onConfirm();
+      };
+
+      cancelBtn.onclick = () => {
+        hideModal();
+        if (onCancel) onCancel();
+      };
+
+      // 취소 버튼 표시 여부 결정
+      if (onCancel === null) {
+        cancelBtn.style.display = 'none';
+      } else {
+        cancelBtn.style.display = 'inline-block';
       }
     }
 

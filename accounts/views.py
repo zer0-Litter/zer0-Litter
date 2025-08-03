@@ -218,7 +218,7 @@ def login_required_with_modal(view_func):
 @login_required_with_modal
 def mypage_home(request):
     username = request.user.username
-    user_complaints = Complaints.objects(user_id=username).order_by('-com_reg_date')
+    user_complaints = Complaints.objects(username=username).order_by('-com_reg_date')
 
     total_count = user_complaints.count()
     complete_count = 0
@@ -272,7 +272,7 @@ def mypage_home(request):
 @login_required
 def complaint_all_list(request):
     username = request.user.username
-    user_complaints = Complaints.objects(user_id=username).order_by('-com_reg_date')
+    user_complaints = Complaints.objects(username=username).order_by('-com_reg_date')
 
     all_complaints = []
     for complaint in user_complaints:
@@ -283,6 +283,7 @@ def complaint_all_list(request):
             status_name = '처리중'
 
         all_complaints.append({
+            'com_id' : complaint.com_id,
             'title': complaint.com_title,
             'date': complaint.com_reg_date,
             'type': complaint.com_type,
