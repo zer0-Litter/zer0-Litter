@@ -6,6 +6,11 @@ html, body {
   background: #f9f9f9;
   font-family: sans-serif;
   height: 100%;
+
+  /* 화면 중앙 정렬 */
+  display: flex;
+  justify-content: center;   /* 수평 중앙 */
+  align-items: center;       /* 수직 중앙 */
 }
 
 
@@ -68,4 +73,24 @@ ul {
   margin: 30px 0 20px 0; /* 위쪽에 여백 추가 */
   color: black;
   text-align: center;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  height: 60px;          /* 상단 nav 높이 */
+  flex-shrink: 0;
+}
+
+main {
+  flex: 1 0 auto;         /* 남은 공간을 차지 */
+  overflow-y: auto;
+}
+
+footer {
+  height: 60px;          /* 하단 nav 높이 */
+  flex-shrink: 0;
 }

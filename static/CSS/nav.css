@@ -1,34 +1,41 @@
-/* nav.css */
-
 .app-wrapper {
-  position: relative; /* 추가 */
-  width: 480px;
+  width: 375px;
+  height: 812px;
   margin: 0 auto;
-  border: 1px solid #ddd;
-  height: 100vh;
-  box-shadow: 0 0 10px rgba(0,0,0,0.05);
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 0 8px rgba(0,0,0,0.1);
   display: flex;
   flex-direction: column;
+  overflow: hidden; /* 전체 스크롤 차단 */
+  position: relative;
 }
 
+/* 상단 헤더 고정 */
 .header {
+  position: absolute; /* 변경 */
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 375px;
+  height: 56px;
+  background-color: #e8f5e9;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem;
-  background-color: #e8f5e9;
-  position: relative; /* 중요 */
-  z-index: 100;
+  padding: 0 1rem;
+  z-index: 1000;
+  box-sizing: border-box;
 }
 
 .logo img {
-  height: 40px;
+  height: 30px;
   vertical-align: middle;
 }
 
 .hamburger {
   position: relative;
-  z-index: 200;
+  z-index: 100; /* side-menu보다 낮게 유지 */
   font-size: 1.5rem;
   background: none;
   border: none;
@@ -60,74 +67,97 @@
   border-bottom: 1px solid #eee;
 }
 
-/* 햄버거 메뉴 a 기본은 normal, hover 시 굵게와 색상 변경 */
 .side-menu a {
   display: block;
   padding: 0.75rem;
   text-decoration: none;
   color: black;
-  font-weight: normal;  /* 기본 굵기 제거 */
+  font-weight: normal;
   transition: background-color 0.3s, color 0.3s, font-weight 0.3s;
 }
 
 .side-menu a:hover {
   background-color: #dcedc8;
   color: #2e7d32;
-  font-weight: bold;  /* hover 시 굵게 */
-  cursor: pointer;
-}
-
-.bottom-nav {
-  position: sticky;
-  bottom: 0;
-  width: 100%;
-  max-width: 480px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-around;
-  background: #f1f8e9;
-  padding: 0.5rem 0;
-  border-top: 1px solid #ccc;
-}
-
-/* 하단 네비게이션 a 기본는 normal, hover 시 굵게와 색상 변경 */
-.bottom-nav a {
-  text-decoration: none;
-  color: #333;
-  font-weight: normal;
-  transition: color 0.3s, font-weight 0.3s;
-}
-
-.bottom-nav a:hover {
-  color: #2e7d32;
   font-weight: bold;
   cursor: pointer;
 }
 
-
-
+/* 메인 콘텐츠 영역 - flex로 높이 채우고, 스크롤은 여기서만 */
 main {
-  flex: 1;
+  margin-top: 56px;     /* 헤더 높이 */
+  margin-bottom: 56px;  /* 하단 네비 높이 */
+  flex: 1;              /* 남은 공간 다 채움 */
+  overflow-y: auto;     /* 내부 스크롤 */
   padding: 20px;
-  overflow-y: auto;
+  width: 375px;
+  box-sizing: border-box;
+  margin-left: auto;
+  margin-right: auto;
+    /* 추가 속성 */
+  min-height: calc(100vh - 112px);  /* 56px 상단 nav + 56px 하단 nav */
+  padding-bottom: 80px;  /* 하단 네비가 가리지 않게 여유 확보 */
 }
 
-.bottom-nav {
-  position: sticky;
+/* 하단 네비 고정 */
+.bottom-nav-modern {
+   position: absolute; /* 변경 */
   bottom: 0;
-  width: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 375px;
+  height: 56px;
+  background-color: #f8fefc;
+  border-top: 1px solid #ddd;
   display: flex;
   justify-content: space-around;
-  background: #f1f8e9;
-  padding: 0.5rem 0;
-  border-top: 1px solid #ccc;
+  align-items: center;
+  padding: 0.5rem 0.25rem;
+  z-index: 1000;
+  box-sizing: border-box;
 }
 
-.bottom-nav a {
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.7rem;
   text-decoration: none;
   color: #333;
+  flex: 1;
+  padding: 0.2rem;
+  transition: color 0.3s;
 }
 
+.nav-icon {
+  width: 20px;
+  height: 20px;
+  color: #333;
+  transition: color 0.3s ease;
+}
+
+.nav-item:hover .nav-icon {
+  color: #2e7d32;
+}
+
+.nav-item:hover span {
+  color: #2e7d32;
+  font-weight: bold;
+}
+
+.central-item {
+  background-color: #4caf4f;
+  border-radius: 99px;
+  padding: 0.3rem;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+}
+
+.central-item .nav-icon {
+  color: white;
+  transition: color 0.3s ease;
+}
+
+/* 공통 모달 */
 .modal-buttons {
   display: flex;
   justify-content: center;
