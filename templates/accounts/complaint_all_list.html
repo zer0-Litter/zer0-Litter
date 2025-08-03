@@ -41,7 +41,7 @@
           </div>
         </div>
         <div class="complaint-action">
-          <a href="#" class="retry-btn" onclick="event.stopPropagation()">재민원넣기</a>
+          <a href="{% url 'complain:complain_add' %}?reuse_com_id={{ c.com_id }}" class="retry-btn">재민원 넣기</a>
         </div>
       </li>
       {% endwith %}

@@ -284,6 +284,7 @@ def complaint_all_list(request):
             status_name = '처리중'
 
         all_complaints.append({
+            'com_id' : complaint.com_id,
             'title': complaint.com_title,
             'date': complaint.com_reg_date,
             'type': complaint.com_type,

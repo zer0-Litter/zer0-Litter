@@ -2,6 +2,141 @@
 {% block title %}민원 제보{% endblock %}
 
 {% block content %}
-  <h1>민원 제보</h1>
-  <p>여기에 원하는 내용을 작성하세요.</p>
+<h1>민원 제보</h1>
+
+<form method="POST" enctype="multipart/form-data" onsubmit="return validateForm();">
+  {% csrf_token %}
+
+  <div>
+    <label for="com_location"><strong>위치</strong></label><br>
+    <input type="text" name="com_location" id="com_location" placeholder="주소를 입력해주세요" required style="width: 100%;">
+  </div>
+
+  <br>
+
+  <div>
+    <label><strong>신고 유형</strong></label><br>
+    <label><input type="checkbox" name="com_type" value="청소요청"> 청소요청</label>
+    <label><input type="checkbox" name="com_type" value="수리요청"> 수리요청</label>
+    <label><input type="checkbox" name="com_type" value="추가요청"> 추가요청</label>
+    <label><input type="checkbox" name="com_type" value="기타"> 기타</label>
+  </div>
+
+  <br>
+
+  <div>
+    <label for="com_contents"><strong>상세 내용(선택)</strong></label><br>
+    <textarea name="com_contents" id="com_contents" rows="5" placeholder="문제를 자세히 설명해주세요" style="width: 100%;"></textarea>
+  </div>
+
+  <br>
+
+  <div>
+    <label for="com_pic1"><strong>사진 1</strong></label><br>
+    <input type="file" name="com_pic1" id="com_pic1"><br>
+    <label for="com_pic2"><strong>사진 2</strong></label><br>
+    <input type="file" name="com_pic2" id="com_pic2">
+  </div>
+
+  <br>
+
+  <div>
+    <label for="com_reg_date"><strong>신고 날짜(자동)</strong></label><br>
+    <input type="text" id="com_reg_date" value="{{ today_date }}" readonly>
+  </div>
+
+  <br><br>
+
+  <div style="display: flex; flex-direction: column; gap: 10px;">
+    <!-- 이전 민원 불러오기 -->
+    <button type="button" onclick="showPreviousComplaintModal()">
+      이전 민원 불러오기
+    </button>
+
+    <!-- 초기화 -->
+    <button type="reset">초기화</button>
+
+    <!-- 신고하기 -->
+    <button type="submit" style="background-color: black; color: white;">신고하기</button>
+  </div>
+
+</form>
+
+{% if show_success_modal %}
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      showModal("민원 등록이 완료되었습니다!", () => {
+        setTimeout(() => {
+          window.location.href = "{% url 'accounts:mypage_home' %}";
+        }, 300);  // 확인 누른 뒤 짧은 텀 주기
+      });
+    });
+  </script>
+{% endif %}
+
+{% if show_login_required_modal %}
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      showModal("로그인이 필요합니다!", () => {
+        window.location.href = "{% url 'accounts:login' %}";
+      });
+    });
+  </script>
+{% endif %}
+
+
+
 {% endblock %}
+
+{% block extra_script %}
+<script>
+  const complaints = {{ all_complaints|safe }};
+
+  function showPreviousComplaintModal() {
+    if (!complaints.length) {
+      showModal("이전 민원이 없습니다.");
+      return;
+    }
+
+    let html = '<strong>이전 민원 목록</strong><ul style="text-align:left;">';
+    complaints.forEach(c => {
+      html += `
+        <li style="margin: 10px 0;">
+          <button onclick="applyComplaint('${c.com_location}', '${c.com_type}', \`${c.com_contents.replace(/`/g, '\\`')}\`)">
+            📌 [${c.com_reg_date.substring(0,10)}] ${c.com_type} - ${c.com_location}
+          </button>
+        </li>
+      `;
+    });
+    html += '</ul>';
+
+    showModal(html);
+  }
+
+  function applyComplaint(location, typeStr, contents) {
+    document.getElementById('com_location').value = location;
+    const types = typeStr.split(',').map(s => s.trim());
+    document.querySelectorAll('input[name="com_type"]').forEach(el => {
+      el.checked = types.includes(el.value);
+    });
+    document.getElementById('com_contents').value = contents;
+    hideModal();
+  }
+
+   function validateForm() {
+    const location = document.getElementById('com_location').value.trim();
+    const checkedTypes = document.querySelectorAll('input[name="com_type"]:checked');
+
+    if (!location || checkedTypes.length === 0) {
+      showModal("위치와 신고유형은 필수 입력입니다.");
+      return false;  // 제출 막기
+    }
+
+    return true;  // 조건 만족 → 제출 허용
+  }
+</script>
+{% endblock %}
+
+
+
+
