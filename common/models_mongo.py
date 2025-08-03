@@ -1,55 +1,11 @@
-from mongoengine import  FloatField, BooleanField, DecimalField, DictField, StringField
+from mongoengine import FloatField, BooleanField, DecimalField, DictField, StringField
 from mongoengine import Document, StringField, DateTimeField, DateField
 from mongoengine import IntField, BinaryField, ReferenceField
-
-class Users(Document):
-    username = StringField(required=True, unique=True, max_length=150)  # 아이디
-    password = StringField(required=True, max_length=128)  # 해시된 비밀번호
-    name = StringField(required=True, max_length=100)
-    birth = DateField(required=True)
-    gender = StringField(max_length=20)
-    address = StringField(max_length=255)
-    phone_number = StringField(max_length=20)
-    user_reg_date = DateTimeField()
-
-    meta = {'collection': 'users'}
-
-
-class Users(Document):
-    username = StringField(required=True, unique=True, max_length=150)  # 아이디
-    password = StringField(required=True, max_length=128)  # 해시된 비밀번호
-    name = StringField(required=True, max_length=100)
-    birth = DateField(required=True)
-    gender = StringField(max_length=20)
-    address = StringField(max_length=255)
-    phone_number = StringField(max_length=20)
-    user_reg_date = DateTimeField()
-
-    meta = {'collection': 'users'}
-
-
-class TrashLoc(Document):
-    t_district_id = StringField(primary_key=True, max_length=100)
-    t_district = StringField(max_length=255)
-    t_road_addr = StringField(max_length=255)
-    t_street_addr = StringField(max_length=255)
-    t_detailed_addr = StringField(max_length=255)
-    t_lat = DecimalField(precision=6)
-    t_lon = DecimalField(precision=6)
-    t_loc = StringField(max_length=50)
-    t_shape = StringField(max_length=50)
-    t_trash_type = StringField(max_length=50)
-    t_dept = StringField(max_length=50)
-    t_contact = StringField(max_length=50)
-    t_date = DateField()
-    t_update_year = IntField()
-    t_addr = StringField(max_length=512)
-
-    meta = {'collection': 'trash_loc'}
 
 
 class ComplaintStatus(Document):
     status_id = StringField(primary_key=True)  # AutoField → 직접 string으로 ID 관리
+    com_id = IntField(required=True)
     status_name = StringField(max_length=50)
     updated_at = DateTimeField()
 
@@ -58,8 +14,8 @@ class ComplaintStatus(Document):
 
 class Complaints(Document):
     com_id = IntField(primary_key=True)  # 자동 증가 직접 관리 필요
-    t_district_id = IntField(required=True)
-    user_id = StringField(max_length=255, required=True)
+    t_district_id = IntField()
+    username = StringField(max_length=255, required=True)
     re_complain = StringField(max_length=255)
     status_id = IntField(required=True)
     com_trashcan = StringField(max_length=255)
@@ -68,6 +24,8 @@ class Complaints(Document):
     com_pic1 = BinaryField()
     com_pic2 = BinaryField()
     com_location = StringField(max_length=255)
+    com_lat = FloatField()
+    com_lon = FloatField()
     com_title = StringField(max_length=255, required=True)
     com_contents = StringField(max_length=255)
     com_reg_date = DateTimeField()
@@ -77,7 +35,7 @@ class Complaints(Document):
 
 class ReComplaints(Document):
     re_com_id = StringField(primary_key=True)
-    user_id = StringField(max_length=255)  # auth.User 대신 직접 저장
+    username = StringField(max_length=255)  # auth.User 대신 직접 저장
     com_id = ReferenceField(Complaints, required=True)
     re_complain = StringField(max_length=255)
     status_id = ReferenceField(ComplaintStatus, null=True)
@@ -87,8 +45,8 @@ class ReComplaints(Document):
 
 
 class ChatHistory(Document):
-    message_id = StringField(primary_key=True)  # AutoField 대체
-    user_id = StringField(max_length=100)
+    chat_id = StringField(primary_key=True)  # AutoField 대체
+    username = StringField(max_length=100)
     scenario_id = StringField(max_length=255)
     session_id = StringField(max_length=255)
     role = StringField(max_length=50)
@@ -104,7 +62,7 @@ class ChatHistory(Document):
 
 class ChatFiles(Document):
     file_id = StringField(primary_key=True)
-    message_id = ReferenceField(ChatHistory, required=True)
+    chat_id = ReferenceField(ChatHistory, required=True)
     file_name = StringField(max_length=255)
     file_path = StringField(max_length=255)
     file_type = StringField(max_length=50)

@@ -67,6 +67,10 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'config.urls'
 
+# 강제로 로그인 이동후 원래 하던 페이지로 돌아가도록
+LOGIN_URL = '/accounts/login/'  # 혹은 이름 기반 URL 사용 시 reverse_lazy로 지정
+
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',

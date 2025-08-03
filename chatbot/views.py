@@ -2,18 +2,6 @@ from django.http import JsonResponse
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
-from .chatbot_core import chatbot_router, generate_session_id
-from common.models import Users
-
-
-@login_required
-def chatbot_view(request):
-    print(f"[DEBUG] 인증 여부: {request.user.is_authenticated}, 사용자: {request.user}")
-
-def chatbot_chat_default(request):
-    # 시나리오 ID 없이 접속하는 기본 챗봇 페이지
-    return render(request, 'chatbot/chatbot_chat_default.html')
 
 
 @csrf_exempt
@@ -42,9 +30,11 @@ def chatbot_api(request):
     return JsonResponse({'error': 'POST 요청만 허용됩니다.'}, status=405)
 
 
+@login_required(login_url='accounts:login')  # 로그인 안 된 경우 login_url로 리다이렉트
 def chatbot_chat(request, scenario_id):
     if request.method == 'POST':
         user_message = request.POST.get('message')
+        # 여기서 챗봇 응답 처리 로직 작성
         # 더미 응답 처리
         bot_response = "이건 더미 응답이에요."
         return render(request, 'chatbot/chatbot_chat.html', {
@@ -53,3 +43,7 @@ def chatbot_chat(request, scenario_id):
             'scenario_id': scenario_id
         })
     return render(request, 'chatbot/chatbot_chat.html', {'scenario_id': scenario_id})
+
+@login_required(login_url='accounts:login')
+def chatbot_chat_default(request):
+    return render(request, 'chatbot/chatbot_chat_default.html')
