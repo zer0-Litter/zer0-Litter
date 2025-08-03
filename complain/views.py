@@ -76,8 +76,8 @@ def complain_add(request):
         })
 
     # 사용자 민원 전체 리스트를 가져와 템플릿으로 전달
-    user_id = request.user.username if request.user.is_authenticated else 'anonymous'
-    user_complaints = Complaints.objects(user_id=user_id).order_by('-com_reg_date')[:10]
+    username = request.user.username if request.user.is_authenticated else 'anonymous'
+    user_complaints = Complaints.objects(username=username).order_by('-com_reg_date')[:10]
 
     all_complaints_json = [
         {
