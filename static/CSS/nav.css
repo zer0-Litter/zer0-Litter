@@ -134,6 +134,7 @@ main {
   height: 20px;
   color: #333;
   transition: color 0.3s ease;
+  margin-bottom: 5px; /* 아이콘과 텍스트 간격 띄우기 */
 }
 
 .nav-item:hover .nav-icon {
