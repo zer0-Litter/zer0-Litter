@@ -1,5 +1,4 @@
 from functools import wraps
-
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
@@ -295,3 +294,10 @@ def complaint_all_list(request):
     return render(request, 'accounts/complaint_all_list.html', {
         'complaints': all_complaints
     })
+
+
+def custom_login_view(request):
+    # 로그인 처리 코드...
+    # 로그인 성공 시
+    next_url = request.GET.get('next') or 'default_home'
+    return redirect(next_url)
