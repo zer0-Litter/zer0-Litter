@@ -120,12 +120,23 @@ def analyze_metadata(user_input):
     }
 
 
-def save_chat_history(username, scenario_id, session_id, role, content, location=None, metadata=None, is_final=False):
+from uuid import uuid4
+
+def save_chat_history(username, scenario_id, session_id, role, content, location=None, metadata=None, is_final=False, chat_id=None):
     """
     MongoDB에 채팅 히스토리 저장
     - location: {"lat": float, "lon": float} 형식으로 받음
+    - chat_id: 세션별 고유 ID 또는 메시지 연결 ID
     """
+    # 고유 chat_id 생성 또는 기존 사용
+    if not chat_id:
+        chat_id = str(uuid4())
+
+    lat = location.get("lat") if location else None
+    lon = location.get("lon") if location else None
+
     doc = {
+        "chat_id": chat_id,
         "username": username,
         "scenario_id": scenario_id,
         "session_id": session_id,
@@ -133,12 +144,23 @@ def save_chat_history(username, scenario_id, session_id, role, content, location
         "content": content,
         "created_at": datetime.now(timezone.utc),
         "is_final": is_final,
-        "location": location if location else {},
+        "location": {
+            "lat": lat,
+            "lon": lon
+        },
         "metadata": metadata if metadata else {}
     }
+
     print(f"[DEBUG] 채팅 저장 | username={username}, scenario_id={scenario_id}, role={role}")
     print("[DEBUG] 저장 내용:", doc)
-    return COLLECTIONS["history"].insert_one(doc).inserted_id
+
+    try:
+        result = COLLECTIONS["history"].insert_one(doc)
+        print(f"[DEBUG] MongoDB 저장 성공: inserted_id={result.inserted_id}")
+        return result.inserted_id
+    except Exception as e:
+        print(f"[ERROR] MongoDB 저장 실패: {e}")
+        return None
 
 
 def save_complaint(username, complaint_data):
