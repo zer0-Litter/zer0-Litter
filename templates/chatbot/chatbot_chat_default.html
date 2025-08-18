@@ -4,9 +4,8 @@
 {% block title %}챗봇{% endblock %}
 
 {% block extra_head %}
-<!-- pretendard font-->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css" />
-  <link rel="stylesheet" href="{% static 'css/chatbot.css' %}">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css" />
+<link rel="stylesheet" href="{% static 'css/chatbot.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -17,36 +16,31 @@
       <div class="message-bubble">
         <span class="icon">🤖</span>
         <span class="text">
-          안녕하세요, <strong>AI 오엘</strong>입니다!
-          <br> 도움이 필요한 버튼을 선택해 주세요 😊
+          안녕하세요, <strong>AI 오엘</strong>입니다!<br>
+          아래 버튼 중 선택해 주세요 😊
         </span>
       </div>
     </div>
+
     <div class="scenario-buttons" style="margin-top: 10px;">
-      <button class="scenario-btn" onclick="startScenario('trash_finder')">
-            🗑️ 쓰레기통 찾기
-      </button>
-      <button class="scenario-btn" onclick="startScenario('complain_report')">
-            📝 민원 제보하기
-      </button>
+      <button class="scenario-btn" onclick="startScenario('trash_finder')">🗑️ 쓰레기통 찾기</button>
+      <button class="scenario-btn" onclick="startScenario('complain_submit')">📝 민원 제보하기</button>
     </div>
   </div>
 
-
-  <form class="chat-input" id="chatForm" method="post" enctype="multipart/form-data" onsubmit="return sendMessage()">
+  <form class="chat-input" id="chatForm">
     {% csrf_token %}
-    <input type="text" name="message" id="messageInput" placeholder="메시지를 입력하세요..." autocomplete="off" />
+    <input type="text" id="messageInput" placeholder="메시지를 입력하세요..." autocomplete="off" />
     <input type="hidden" id="latitudeInput" name="latitude">
     <input type="hidden" id="longitudeInput" name="longitude">
     <label for="fileUpload" class="file-label">📷</label>
-    <input type="file" id="fileUpload" name="file" accept="image/*" capture="environment" style="display: none;" onchange="uploadFile()">
+    <input type="file" id="fileUpload" name="file" accept="image/*" capture="environment" style="display:none;" onchange="uploadFile()">
     <button type="submit">전송</button>
   </form>
 </div>
 
-
 <script>
-// CSRF 토큰 가져오기
+// ---------------- CSRF 토큰 ----------------
 function getCookie(name) {
   let cookieValue = null;
   if (document.cookie && document.cookie !== '') {
@@ -63,27 +57,18 @@ function getCookie(name) {
 }
 const csrftoken = getCookie('csrftoken');
 
-// UUID 기반 세션 ID 생성
-function generateUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-    const r = Math.random() * 16 | 0,
-          v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
-const session_id = generateUUID();
+// ---------------- 세션, 시나리오 ----------------
+let session_id = null;
+let current_scenario = null;
 
-// 초기 인사말 출력 --> 이거 백에서 하는 중
-<!--window.addEventListener('DOMContentLoaded', () => {-->
-<!--  appendMessage('assistant', '안녕하세요! 무엇을 도와드릴까요? 😊');-->
-<!--});-->
-
+// ---------------- 시나리오 선택 ----------------
 function startScenario(scenarioId) {
+  current_scenario = scenarioId;
   appendMessage('assistant', `시나리오 "${scenarioId}"를 시작합니다.`);
-  // 추가적인 서버 처리 필요시 여기에 fetch 요청 추가 가능
 }
 
-function appendMessage(role, text, imgUrl) {
+// ---------------- 메시지 추가 ----------------
+function appendMessage(role, text, imgUrl=null) {
   const chatWindow = document.getElementById('chatWindow');
   const msgDiv = document.createElement('div');
   msgDiv.className = `chat-message ${role}`;
@@ -111,86 +96,70 @@ function appendMessage(role, text, imgUrl) {
   chatWindow.scrollTop = chatWindow.scrollHeight;
 }
 
+// ---------------- 메시지 전송 ----------------
 function sendMessage() {
   const input = document.getElementById('messageInput');
   const message = input.value.trim();
   if (!message) return false;
 
+  console.log("sendMessage 호출됨, 메시지:", message);
   appendMessage('user', message);
   input.value = '';
 
-  // 인사말 자동 응답
-  const lowerMsg = message.toLowerCase();
-  const greetingResponses = {
-    '안녕': '안녕하세요! 무엇을 도와드릴까요?',
-    'hello': 'Hello! How can I help you?',
-    '고마워': '천만에요! 도움이 되었다니 기뻐요 😊',
-    '감사': '감사합니다! 언제든지 도와드릴게요.',
-    '잘가': '안녕히 가세요! 또 만나요 👋',
-    'bye': 'Goodbye! Take care!'
-  };
-  for (const key in greetingResponses) {
-    if (lowerMsg.includes(key)) {
-      setTimeout(() => {
-        appendMessage('assistant', greetingResponses[key]);
-      }, 600);
-      return false;
-    }
-  }
-
-  // 위치정보 포함 후 메시지 전송
   navigator.geolocation.getCurrentPosition(
     (position) => {
-      document.getElementById('latitudeInput').value = position.coords.latitude;
-      document.getElementById('longitudeInput').value = position.coords.longitude;
-
       const data = new FormData();
       data.append('message', message);
-      data.append('session_id', session_id);
-      data.append('scenario_id', 'complain_submit');
+      data.append('session_id', session_id || '');
+      data.append('scenario_id', current_scenario || 'complain_submit');
       data.append('lat', position.coords.latitude);
       data.append('lon', position.coords.longitude);
 
+      console.log("fetch 호출 전, FormData:", data);
+
       fetch('/chatbot/chatbot_api/', {
         method: 'POST',
-        headers: {
-          'X-CSRFToken': csrftoken
-        },
+        headers: { 'X-CSRFToken': csrftoken },
         body: data
       })
-      .then(response => response.json())
+      .then(resp => {
+        console.log("fetch 응답 도착:", resp);
+        return resp.json();
+      })
       .then(json => {
-        if (json.response) {
-          appendMessage('assistant', json.response);
-        } else if (json.error) {
-          appendMessage('assistant', `오류: ${json.error}`);
-        }
+        console.log("fetch JSON:", json);
+        if (json.response) appendMessage('assistant', json.response);
+        if (json.session_id) session_id = json.session_id;
       })
       .catch(err => {
+        console.error("fetch 에러:", err);
         appendMessage('assistant', '서버와 통신 중 오류가 발생했습니다.');
-        console.error(err);
       });
     },
-    (error) => {
-      appendMessage('assistant', '위치 정보를 가져오는 데 실패했습니다.');
-    }
+    () => appendMessage('assistant', '위치 정보를 가져올 수 없습니다.')
   );
 
   return false;
 }
 
+// ---------------- 이미지 업로드 ----------------
 function uploadFile() {
   const fileInput = document.getElementById('fileUpload');
   const file = fileInput.files[0];
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = function (e) {
+  reader.onload = function(e) {
     appendMessage('user', '', e.target.result);
   };
   reader.readAsDataURL(file);
-
-  // 서버 전송 로직 추가 가능
 }
+
+// ---------------- form submit 이벤트 ----------------
+document.getElementById('chatForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  sendMessage();
+});
+
 </script>
 {% endblock %}
