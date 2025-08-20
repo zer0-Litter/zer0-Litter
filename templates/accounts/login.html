@@ -57,9 +57,12 @@
       if (data.access) {
         localStorage.setItem('access_token', data.access);
         localStorage.setItem('refresh_token', data.refresh);
-        window.location.href = '/';
+
+        // 서버가 내려준 redirect로 이동 (스태프면 pending_list, 아니면 마이페이지)
+        const target = data.redirect || "{% url 'trash_loc:home' %}";
+        window.location.href = target;
       } else {
-        showModal(data.message || '로그인 실패');
+        showModal(data.message || data.detail || '로그인 실패');
       }
     })
     .catch(() => {

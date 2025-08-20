@@ -1,0 +1,37 @@
+{% extends 'nav_base.html' %}
+{% load static %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/complain_staff.css' %}">
+{% endblock %}
+
+{% block content %}
+<h2>처리완료 민원</h2>
+
+<div class="list-switch">
+  <a href="{% url 'complain:all_list' %}"       class="tab {% if request.resolver_match.url_name == 'all_list' %}active{% endif %}">전체</a>
+  <a href="{% url 'complain:pending_list' %}"   class="tab {% if request.resolver_match.url_name == 'pending_list' %}active{% endif %}">처리중</a>
+  <a href="{% url 'complain:completed_list' %}" class="tab {% if request.resolver_match.url_name == 'completed_list' %}active{% endif %}">처리완료</a>
+</div>
+
+<ul class="complaint-list">
+  {% for it in items %}
+    {% with c=it.doc last=it.last %}
+    <li class="complaint-item">
+      <div class="complaint-title">
+        <b>#{{ c.com_id }}</b>
+        <span class="author">작성자: {{ c.username }}</span>
+        <span class="summary">| {{ c.com_type }} | {{ c.com_location }}</span>
+      </div>
+
+      <div class="complaint-meta">
+        <span class="badge">처리완료</span>
+        <span>등록: {{ c.com_reg_date|date:"Y-m-d H:i" }}</span>
+        {% if last %}<span> / 완료자: {{ last.changed_by }} / {{ last.updated_at|date:"Y-m-d H:i" }}</span>{% endif %}
+      </div>
+
+    </li>
+    {% endwith %}
+  {% endfor %}
+</ul>
+{% endblock %}

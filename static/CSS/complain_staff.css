@@ -1,0 +1,38 @@
+/* --- 상단 탭을 버튼처럼 --- */
+.list-switch{display:flex; gap:10px; margin:8px 0 14px;}
+.list-switch .tab{
+  display:inline-flex; align-items:center; justify-content:center;
+  height:40px; padding:0 16px;
+  border:1px solid #d0d0d0; border-radius:999px;
+  font-weight:600; text-decoration:none; color:#111; background:#fff;
+  box-shadow:0 1px 0 rgba(0,0,0,.02); cursor:pointer;
+}
+.list-switch .tab:hover{box-shadow:0 1px 8px rgba(0,0,0,.08);}
+.list-switch .tab.active{background:#111; color:#fff; border-color:#111;}
+
+/* --- 카드형 리스트 --- */
+.complaint-list{list-style:none; padding:0; margin:0; display:grid; gap:12px;}
+.complaint-item{
+  border:1px solid #e6e6e6; border-radius:12px; padding:12px 14px; background:#fff;
+  box-shadow:0 2px 10px rgba(0,0,0,.02);
+}
+.complaint-title b{font-weight:800;}
+.complaint-title .author{margin-left:8px; color:#666; font-weight:600;}
+.complaint-title .summary{margin-left:6px;}
+.complaint-meta{margin-top:6px; color:#555; font-size:13px;}
+.badge{
+  display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px;
+  border:1px solid #e0e0e0; background:#f4f4f4; color:#555; margin-right:6px;
+}
+
+/* --- 액션 버튼 --- */
+.btn-action{
+  margin-top:8px; padding:10px 14px; border-radius:10px;
+  border:1px solid #111; background:#111; color:#fff; cursor:pointer;
+}
+.btn-action:hover{filter:brightness(1.05);}
+
+/* --- 모바일 보정 --- */
+@media (max-width:420px){
+  .complaint-title .summary{display:block; margin-left:0; margin-top:4px;}
+}
