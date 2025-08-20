@@ -87,15 +87,15 @@
 main {
   margin-top: 56px;     /* 헤더 높이 */
   margin-bottom: 56px;  /* 하단 네비 높이 */
-  flex: 1;              /* 남은 공간 다 채움 */
   overflow-y: auto;     /* 내부 스크롤 */
   padding: 20px;
   width: 375px;
   box-sizing: border-box;
   margin-left: auto;
   margin-right: auto;
+  height: calc(100% - 112px);
     /* 추가 속성 */
-  min-height: calc(100vh - 112px);  /* 56px 상단 nav + 56px 하단 nav */
+  /*min-height: calc(100vh - 112px);*/  /* 56px 상단 nav + 56px 하단 nav */
   padding-bottom: 80px;  /* 하단 네비가 가리지 않게 여유 확보 */
 }
 

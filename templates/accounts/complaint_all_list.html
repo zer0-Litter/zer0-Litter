@@ -21,32 +21,29 @@
 
   <ul class="complaint-list">
     {% for c in complaints %}
-      {% with icon_path='img/icon_'|add:c.type.0|add:'.png' %}
+      {% with icon_path='img/icon_'|add:c.icon_type|add:'.png' %}
       <li class="complaint-item"
           onclick="showComplaintDetailModal(this)"
-          data-type="{{ c.type|join:', ' }}"
+          data-type="{{ c.type_display }}"
           data-date="{{ c.date|date:'Y-m-d' }}"
           data-location="{{ c.location }}"
           data-title="{{ c.title }}"
-          data-content="{{ c.contents }}"
-          data-re="{{ c.re_complain }}"
-          data-trashcan="{{ c.com_trashcan }}"
-          data-status="{{ c.status_name }}"
-          data-trash_type="{{ c.com_trash_type }}">
+          data-content="{{ c.content }}">
         <div class="complaint-left">
           <img src="{% static icon_path %}" class="icon" alt="아이콘">
           <div class="complaint-info">
-            <p class="complaint-title">{{ c.type|join:", " }}</p>
+            <p class="complaint-title">{{ c.type_display }}</p>
             <p class="complaint-date">{{ c.date|date:"Y-m-d" }}, {{ c.location }}</p>
           </div>
         </div>
         <div class="complaint-action">
-          <a href="{% url 'complain:complain_add' %}?reuse_com_id={{ c.com_id }}" class="retry-btn">재민원 넣기</a>
+          <a href="{% url 'complain:complain_reuse' c.com_id %}" class="retry-btn">재민원 넣기</a>
         </div>
       </li>
       {% endwith %}
     {% endfor %}
   </ul>
+
 
 
   <div class="add-btn-wrapper">

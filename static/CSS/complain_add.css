@@ -1,0 +1,336 @@
+/* ---- 기본 ---- */
+:root{
+  --gap: 14px;        /* 섹션 사이 간격 */
+  --gap-sm: 8px;      /* 라벨-입력 간격, 내부 간격 */
+  --radius: 12px;
+  --border: #e6e6e6;
+  --text: #111;
+  --muted: #666;
+  --bg: #f6f6f6;
+}
+
+body { background: var(--bg); }
+
+h1{
+  max-width: 430px;
+  margin: 12px auto 10px;
+  padding: 0 16px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ---- 폼 공통 ---- */
+#complain-form{
+  max-width: 430px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(0,0,0,.04);
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+/* 섹션 블록 간격 (첫 섹션은 0) */
+#complain-form > div{ margin-top: var(--gap); }
+#complain-form > div:first-of-type{ margin-top: 0; }
+
+/* 라벨/제목 아래 간격 */
+#complain-form label[for],
+#complain-form label strong{
+  display:block;
+  margin-bottom: var(--gap-sm);
+}
+
+/* 입력 요소 */
+#complain-form input[type="text"],
+#complain-form textarea{
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fafafa;
+  outline: none;
+  transition: border-color .15s ease, background .15s ease;
+}
+#complain-form input[type="text"]:focus,
+#complain-form textarea:focus{
+  border-color: var(--text);
+  background: #fff;
+}
+#com_contents{
+  min-height: 96px;
+  resize: vertical;
+}
+
+/* ---- 신고 유형 (칩) ---- */
+/* 컨테이너: 한 줄 유지 + 필요 시 가로 스크롤 */
+#complain-form > div:nth-of-type(2){
+  display: flex;
+  flex-wrap: wrap;         /* 줄바꿈 허용 */
+  gap: 8px;
+}
+
+/* "신고 유형" 제목은 100% 폭 차지해서 위에 표시 */
+#complain-form > div:nth-of-type(2) > label:first-child{
+  flex: 0 0 100%;           /* 한 줄 전체 차지 */
+  margin-bottom: var(--gap-sm);
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: default;
+}
+
+/* 칩 */
+/* 칩 스타일 (제목 제외) */
+#complain-form > div:nth-of-type(2) > label:not(:first-child){
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+  user-select: none;
+  transition: all .15s ease;
+}
+
+/* 체크박스 숨김(접근성 유지) */
+#complain-form > div:nth-of-type(2) > label > input[type="checkbox"]{
+  appearance: none;
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px;
+  clip: rect(0,0,0,0);
+  overflow: hidden;
+}
+
+/* 선택 상태 */
+#complain-form > div:nth-of-type(2) > label:not(:first-child):has(input[type="checkbox"]:checked){
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+/* ---- 사진 업로드 ---- */
+#photo-list{
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px !important;
+  width: 100%;
+  margin-top: var(--gap-sm) !important;
+}
+
+#photo-list > div[id^="photo-wrap-"]{
+  min-width: 0;
+  min-height: 96px;
+  padding: 8px !important;
+  border: 1px dashed #ddd !important;
+  background: #fcfcfc;
+  border-radius: 10px !important;
+}
+
+#photo-list > div[id^="photo-wrap-"] > div{
+  font-size: 12px !important;
+  color: #555;
+  margin-bottom: 6px;
+}
+
+#photo-list input[type="file"]{
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
+  overflow: hidden;
+}
+
+#photo-list img{
+  width: 100%;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-top: 6px;
+}
+
+#photo-list button{
+  margin-top: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: #fff;
+  cursor: pointer;
+}
+
+/* 추가 버튼 */
+#btn-add-photo{
+  margin-top: var(--gap-sm);
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+#btn-add-photo:disabled{ opacity: .5; cursor: default; }
+
+/* 날짜 필드 */
+#com_reg_date{ background: #f5f5f5; color: var(--muted); }
+
+/* ---- 하단 버튼 ---- */
+#fixed-buttons{
+  width: min(430px, 92%);
+  margin: var(--gap) auto 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#fixed-buttons button{
+  width: 100%;
+  padding: 14px;
+  border-radius: 14px;
+  font-size: 15px;
+  cursor: pointer;
+}
+#fixed-buttons button:nth-child(1),
+#fixed-buttons button:nth-child(2){
+  background: #fff;
+  border: 1px solid #111;
+  color: #111;
+}
+#fixed-buttons button:nth-child(3){
+  background: #111 !important;
+  color: #fff !important;
+  border: 1px solid #111;
+}
+
+/* ---- 반응형 ---- */
+@media (max-width: 360px){
+  #photo-list{ grid-template-columns: 1fr; }
+}
+
+/* ===== 이전 민원 모달 전용 스타일 ===== */
+#common-modal .modal-content{
+  width: min(560px, 92%);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 12px 28px rgba(0,0,0,.14);
+  background: #fff;
+}
+
+/* p#modal-message 안에 들어가는 래퍼 기본값 정리 */
+#modal-message{
+  margin: 0;
+  padding: 0;
+}
+
+/* 컨테이너 */
+.prevc-wrap{
+  display: grid;
+  grid-template-rows: auto minmax(0,1fr) auto;
+  gap: 12px;
+  max-height: 70vh;              /* 모달 내부 스크롤 */
+}
+
+/* 헤더 */
+.prevc-header{
+  text-align: center;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+/* 리스트 영역 */
+.prevc-list{
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fafafa;
+  padding: 10px;
+}
+
+/* 아이템 */
+.prevc-item{ margin: 0; }
+.prevc-card{
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  transition: box-shadow .15s ease, transform .05s ease, border-color .15s ease;
+}
+
+.prevc-card:hover{
+  box-shadow: 0 6px 16px rgba(0,0,0,.08);
+  border-color: #cfcfcf;
+}
+.prevc-card:active{ transform: translateY(1px); }
+.prevc-card:focus{ outline: 2px solid #111; outline-offset: 2px; }
+
+/* 핀 아이콘 */
+.prevc-pin{ font-size: 18px; }
+
+/* 본문(한 줄 줄바꿈 방지 + 말줄임) */
+.prevc-body{ min-width: 0; display: grid; gap: 4px; }
+.prevc-date{
+  display: inline-block;
+  font-size: 12px;
+  line-height: 1;
+  color: #555;
+  background: #f0f0f0;
+  border: 1px solid #e5e5e5;
+  padding: 4px 8px;
+  border-radius: 999px;
+  width: fit-content;
+}
+.prevc-title{
+  display: -webkit-box;
+  -webkit-line-clamp: 2;     /* 2줄 말줄임 */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 14px;
+  color: var(--text);
+}
+
+/* 푸터(확인 버튼) */
+.prevc-footer{
+  display: flex;
+  justify-content: center;
+  margin-top: 2px;
+}
+.prevc-close{
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+.prevc-close:hover{ background: #f7f7f7; }
+
+/* 작은 화면 최적화 */
+@media (max-width: 360px){
+  #common-modal .modal-content{ width: 92%; padding: 14px; }
+  .prevc-title{ -webkit-line-clamp: 3; }  /* 더 많은 줄 허용 */
+}
+
+/* 이전 민원 모달일 때 기본 모달 버튼 숨기기 */
+#modal-message:has(.prevc-wrap) + .modal-buttons { display: none; }
+

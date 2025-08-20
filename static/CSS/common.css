@@ -8,9 +8,9 @@ html, body {
   height: 100%;
 
   /* 화면 중앙 정렬 */
-  /* display: flex;
-  justify-content: center;*/   /* 수평 중앙 */
-  /* align-items: center; */       /* 수직 중앙 */
+  display: flex;
+  justify-content: center;  /* 수평 중앙 */
+  align-items: center;       /* 수직 중앙 */
 }
 
 
