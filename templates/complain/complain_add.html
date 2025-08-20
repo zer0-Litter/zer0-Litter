@@ -1,66 +1,67 @@
 {% extends 'nav_base.html' %}
+{% load static %}
+
 {% block title %}민원 제보{% endblock %}
 
-{% block content %}
-<h1>민원 제보</h1>
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'css/complain_add.css' %}">
+{% endblock %}
 
-<form method="POST" enctype="multipart/form-data" onsubmit="return validateForm();">
+
+{% block content %}
+<h1 style="padding-left: 0px;">민원 제보</h1>
+
+<form id="complain-form"
+      method="POST"
+      action="{% url 'complain:complain_add' %}"
+      enctype="multipart/form-data"
+      onsubmit="return validateForm();">
   {% csrf_token %}
 
   <div>
-    <label for="com_location"><strong>위치</strong></label><br>
-    <input type="text" name="com_location" id="com_location" placeholder="주소를 입력해주세요" required style="width: 100%;">
+    <label for="com_location"><strong>위치</strong></label>
+    <input type="text" name="com_location" id="com_location" value="{{ initial.location|default:'' }}" placeholder="구+도로명+번호까지 입력해주세요" required style="width: 100%;" />
   </div>
 
-  <br>
 
   <div>
-    <label><strong>신고 유형</strong></label><br>
-    <label><input type="checkbox" name="com_type" value="청소요청"> 청소요청</label>
-    <label><input type="checkbox" name="com_type" value="수리요청"> 수리요청</label>
-    <label><input type="checkbox" name="com_type" value="추가요청"> 추가요청</label>
-    <label><input type="checkbox" name="com_type" value="기타"> 기타</label>
+    <label><strong>신고 유형</strong></label>
+    <label><input type="checkbox" name="com_type" value="청소요청" {% if initial and '청소요청' in initial.types %}checked{% endif %} /> 청소요청</label>
+    <label><input type="checkbox" name="com_type" value="수리요청" {% if initial and '수리요청' in initial.types %}checked{% endif %} /> 수리요청</label>
+    <label><input type="checkbox" name="com_type" value="추가요청" {% if initial and '추가요청' in initial.types %}checked{% endif %} /> 추가요청</label>
+    <label><input type="checkbox" name="com_type" value="기타" {% if initial and '기타' in initial.types %}checked{% endif %}> 기타</label>
   </div>
 
-  <br>
 
   <div>
-    <label for="com_contents"><strong>상세 내용(선택)</strong></label><br>
-    <textarea name="com_contents" id="com_contents" rows="5" placeholder="문제를 자세히 설명해주세요" style="width: 100%;"></textarea>
+    <label for="com_contents"><strong>상세 내용(선택)</strong></label>
+    <textarea name="com_contents" id="com_contents" rows="5" placeholder="문제를 자세히 설명해주세요" style="width: 100%;">{{ initial.contents|default:'' }}</textarea>
   </div>
 
-  <br>
 
   <div>
-    <label for="com_pic1"><strong>사진 1</strong></label><br>
-    <input type="file" name="com_pic1" id="com_pic1"><br>
-    <label for="com_pic2"><strong>사진 2</strong></label><br>
-    <input type="file" name="com_pic2" id="com_pic2">
+    <label><strong>사진 추가 (최대 2장)</strong></label>
+    <div id="photo-list" style="display:flex; gap:12px; flex-wrap:wrap;"></div>
+    <button type="button" id="btn-add-photo">+ 사진 추가</button>
   </div>
 
-  <br>
 
   <div>
-    <label for="com_reg_date"><strong>신고 날짜(자동)</strong></label><br>
+    <label for="com_reg_date"><strong>신고 날짜(자동)</strong></label>
     <input type="text" id="com_reg_date" value="{{ today_date }}" readonly>
   </div>
 
-  <br><br>
 
-  <div style="display: flex; flex-direction: column; gap: 10px;">
-    <!-- 이전 민원 불러오기 -->
-    <button type="button" onclick="showPreviousComplaintModal()">
-      이전 민원 불러오기
-    </button>
+  <input type="hidden" name="is_reuse" id="is_reuse" value="{{ is_reuse|default:'N' }}">
+  <input type="hidden" name="origin_com_id" id="origin_com_id" value="{{ origin_com_id|default:'' }}">
+</form>
 
-    <!-- 초기화 -->
-    <button type="reset">초기화</button>
-
-    <!-- 신고하기 -->
-    <button type="submit" style="background-color: black; color: white;">신고하기</button>
+  <div id="fixed-buttons">
+    <button type="button" onclick="showPreviousComplaintModal()">이전 민원 불러오기</button>
+    <button type="button" id="btn-reset">초기화</button>
+    <button type="submit" form="complain-form" style="background-color: black; color: white;">신고하기</button>
   </div>
 
-</form>
 
 {% if show_success_modal %}
   <script>
@@ -74,52 +75,75 @@
   </script>
 {% endif %}
 
-{% if show_login_required_modal %}
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      showModal("로그인이 필요합니다!", () => {
-        window.location.href = "{% url 'accounts:login' %}";
-      });
-    });
-  </script>
-{% endif %}
-
-
 
 {% endblock %}
 
 {% block extra_script %}
+
+{{ all_complaints|json_script:"complaints-data" }}
+
 <script>
-  const complaints = {{ all_complaints|safe }};
+
+
+  const complaints = JSON.parse(document.getElementById('complaints-data').textContent);
 
   function showPreviousComplaintModal() {
-    if (!complaints.length) {
+    if (!Array.isArray(complaints) || complaints.length === 0) {
       showModal("이전 민원이 없습니다.");
       return;
     }
 
-    let html = '<strong>이전 민원 목록</strong><ul style="text-align:left;">';
-    complaints.forEach(c => {
-      html += `
-        <li style="margin: 10px 0;">
-          <button onclick="applyComplaint('${c.com_location}', '${c.com_type}', \`${c.com_contents.replace(/`/g, '\\`')}\`)">
-            📌 [${c.com_reg_date.substring(0,10)}] ${c.com_type} - ${c.com_location}
+    const esc = s => String(s || '').replace(/`/g, '\\`');
+
+    let listHtml = complaints.map(c => {
+      const d = (c.com_reg_date || '').substring(0,10);
+      return `
+        <li class="prevc-item">
+          <button type="button" class="prevc-card"
+            onclick="applyComplaint(\`${esc(c.com_location)}\`, \`${esc(c.com_type)}\`, \`${esc(c.com_contents)}\`, ${c.com_id})"
+            aria-label="이전 민원 적용">
+            <span class="prevc-pin" aria-hidden="true">📌</span>
+            <span class="prevc-body">
+              <span class="prevc-date"> ${d} </span>
+              <span class="prevc-title">${esc(c.com_type)} - ${esc(c.com_location)}</span>
+            </span>
           </button>
         </li>
       `;
-    });
-    html += '</ul>';
+    }).join('');
+
+    const html = `
+      <div class="prevc-wrap">
+        <div class="prevc-header">
+          <strong>이전 민원 목록</strong>
+        </div>
+        <ul class="prevc-list">
+          ${listHtml}
+        </ul>
+        <div class="prevc-footer">
+          <button type="button" class="prevc-close" onclick="hideModal()">확인</button>
+        </div>
+      </div>
+    `;
 
     showModal(html);
   }
 
-  function applyComplaint(location, typeStr, contents) {
+
+  function applyComplaint(location, typeStr, contents, comId) {
     document.getElementById('com_location').value = location;
-    const types = typeStr.split(',').map(s => s.trim());
+
+    const types = String(typeStr || '').split(',').map(s => s.trim()).filter(Boolean);
     document.querySelectorAll('input[name="com_type"]').forEach(el => {
       el.checked = types.includes(el.value);
     });
-    document.getElementById('com_contents').value = contents;
+
+    document.getElementById('com_contents').value = contents || '';
+
+    // 🔽 재민원 플래그/원본 com_id 세팅
+    document.getElementById('is_reuse').value = 'Y';
+    document.getElementById('origin_com_id').value = String(comId || '');
+
     hideModal();
   }
 
@@ -134,6 +158,135 @@
 
     return true;  // 조건 만족 → 제출 허용
   }
+
+  // 동적으로 만드는 파일 input 개수 (최대 2)
+  let photoCount = 0;
+
+  function updateAddButton() {
+    const btn = document.getElementById('btn-add-photo');
+    btn.disabled = (photoCount >= 2);
+  }
+
+  function addPhotoInput() {
+    if (photoCount >= 2) return;
+
+    photoCount += 1;
+    const name = (photoCount === 1) ? 'com_pic1' : 'com_pic2';
+    const idx = photoCount;
+
+    // 래퍼
+    const wrap = document.createElement('div');
+    wrap.style.border = '1px solid #ddd';
+    wrap.style.padding = '8px';
+    wrap.style.borderRadius = '8px';
+    wrap.style.position = 'relative';
+    wrap.id = `photo-wrap-${idx}`;
+
+    // 라벨
+    const label = document.createElement('div');
+    label.textContent = `사진 ${idx}`;
+    label.style.fontWeight = 'bold';
+
+    // 파일 입력
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.name = name;               // 백엔드가 기대하는 이름
+    input.accept = 'image/*';
+    input.id = `photo-input-${idx}`;
+
+    // 미리보기
+    const preview = document.createElement('img');
+    preview.style.width = '100%';
+    preview.style.height = '80px';
+    preview.style.objectFit = 'cover';
+    preview.style.display = 'none';
+
+    input.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) { preview.style.display = 'none'; preview.src = ''; return; }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        preview.src = ev.target.result;
+        preview.style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // 삭제 버튼
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.textContent = '삭제';
+    removeBtn.style.marginTop = '6px';
+    removeBtn.addEventListener('click', () => {
+      wrap.remove();
+      // 삭제 후 이름 재정렬(중간 사진을 지울 수도 있으므로)
+      renumberPhotoInputs();
+    });
+
+    wrap.appendChild(label);
+    wrap.appendChild(input);
+    wrap.appendChild(preview);
+    wrap.appendChild(removeBtn);
+
+    document.getElementById('photo-list').appendChild(wrap);
+    updateAddButton();
+  }
+
+  function renumberPhotoInputs() {
+    // 남아있는 입력들을 com_pic1, com_pic2로 다시 이름 지정
+    const wraps = Array.from(document.querySelectorAll('#photo-list > div[id^="photo-wrap-"]'));
+    photoCount = 0;
+    wraps.forEach((wrap, i) => {
+      const input = wrap.querySelector('input[type="file"]');
+      const preview = wrap.querySelector('img');
+      photoCount += 1;
+      const idx = photoCount;
+      input.name = (idx === 1) ? 'com_pic1' : 'com_pic2';
+      input.id = `photo-input-${idx}`;
+      wrap.id = `photo-wrap-${idx}`;
+      wrap.querySelector('div').textContent = `사진 ${idx}`;
+    });
+    updateAddButton();
+  }
+
+  document.getElementById('btn-add-photo').addEventListener('click', addPhotoInput);
+
+  // 필요하면 최초에 한 칸만 미리 만들어 둘 수도 있음:
+  // addPhotoInput();
+
+  // 기존의 validateForm와 함께 사용 가능 (최대 2장 제한은 버튼/삭제 로직으로 보장)
+
+  const formEl = document.getElementById('complain-form');
+
+  // 완전 수동 초기화 (기본값도 빈 값으로 교체)
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    // 1) 텍스트/텍스트에어리어
+    const loc = document.getElementById('com_location');
+    const cont = document.getElementById('com_contents');
+    loc.value = '';          loc.defaultValue = '';      // reset 기준도 빈값으로
+    cont.value = '';         cont.defaultValue = '';
+
+    // 2) 체크박스 전부 해제
+    document.querySelectorAll('input[name="com_type"]').forEach(el => {
+      el.checked = false;
+      el.defaultChecked = false;   // reset 기준도 해제 상태로
+    });
+
+    // 3) 사진 입력들 제거/초기화
+    document.getElementById('photo-list').innerHTML = '';
+    photoCount = 0;
+    updateAddButton();
+
+    // 4) 재민원 플래그/원본 id도 초기화 (완전 신규로 전환)
+    const reuse = document.getElementById('is_reuse');
+    const origin = document.getElementById('origin_com_id');
+    reuse.value = 'N';       reuse.defaultValue = 'N';
+    origin.value = '';       origin.defaultValue = '';
+
+    // 5) 포커스 UX
+    loc.focus();
+  });
+
 </script>
 {% endblock %}
 

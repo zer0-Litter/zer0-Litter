@@ -20,9 +20,8 @@ from django.contrib.auth import logout
 import json
 import re
 from common.models_mongo import Complaints, ComplaintStatus
-from bson import ObjectId
 from django.contrib.auth import logout as django_logout
-
+from django.urls import reverse
 
 
 # Create your views here.
@@ -88,11 +87,15 @@ class LoginView(APIView):
         # Django 세션 로그인 수행
         auth_login(request, user)
 
-        # 로그인 성공 후, 최소 데이터만 반환
+        # 스태프면 관리자용(스태프) 페이지로, 아니면 trash_loc 홈으로
+        target = reverse('complain:pending_list') if user.is_staff else reverse('trash_loc:home')
+
         return Response({
             "username": username,
             "access": str(refresh.access_token),
-            "refresh": str(refresh)
+            "refresh": str(refresh),
+            "redirect": target,  # ← 프런트에서 이 값으로 window.location.href 이동
+            "is_staff": bool(user.is_staff)  # (옵션) 프런트 분기용
         }, status=status.HTTP_200_OK)
 
 
@@ -225,13 +228,11 @@ def mypage_home(request):
     processing_count = 0
 
     for complaint in user_complaints:
-        try:
-            status = ComplaintStatus.objects(status_id=ObjectId(complaint.status_id)).first()
-            name = status.status_name if status else '처리중'
-        except Exception:
-            name = '처리중'
+        last = ComplaintStatus.objects(com_id=complaint.com_id) \
+            .order_by('-updated_at', '-status_id').first()
+        name = last.status_name if last else '처리중'
 
-        if name == '완료':
+        if name == '처리완료':
             complete_count += 1
         else:
             processing_count += 1
@@ -240,22 +241,20 @@ def mypage_home(request):
     complaints_display = []
 
     for complaint in recent_complaints:
-        try:
-            status = ComplaintStatus.objects(status_id=ObjectId(complaint.status_id)).first()
-            status_name = status.status_name if status else '처리중'
-        except Exception:
-            status_name = '처리중'
+        last = ComplaintStatus.objects(com_id=complaint.com_id) \
+            .order_by('-updated_at', '-status_id').first()
+        status_name = last.status_name if last else '처리중'
 
         complaint_type = complaint.com_type
         if isinstance(complaint_type, list):
-            icon_type = complaint_type[0]
+            icon_type = complaint_type[0]  # 전체 문자열
         else:
             icon_type = complaint_type.split(',')[0].strip()
 
         complaints_display.append({
             'title': complaint.com_title,
             'date': complaint.com_reg_date,
-            'type': complaint_type,
+            'type': complaint_type,  # 여기도 전체 리스트/문자열 그대로
             'location': complaint.com_location,
             'status': status_name,
             'icon_type': icon_type
@@ -269,6 +268,7 @@ def mypage_home(request):
     })
 
 
+
 @login_required
 def complaint_all_list(request):
     username = request.user.username
@@ -276,19 +276,31 @@ def complaint_all_list(request):
 
     all_complaints = []
     for complaint in user_complaints:
-        try:
-            status = ComplaintStatus.objects(status_id=ObjectId(complaint.status_id)).first()
-            status_name = status.status_name if status else '처리중'
-        except Exception:
-            status_name = '처리중'
+        # 상태명
+        last = ComplaintStatus.objects(com_id=complaint.com_id) \
+            .order_by('-updated_at', '-status_id').first()
+        status_name = last.status_name if last else '처리중'
+
+        # 타입 표준화: 리스트 보장 + 표시문자열 + 아이콘용 첫 항목
+        raw_type = complaint.com_type
+        if isinstance(raw_type, list):
+            type_list = [t.strip() for t in raw_type if t and str(t).strip()]
+        else:
+            type_list = [t.strip() for t in str(raw_type).split(',') if t.strip()]
+
+        type_display = ', '.join(type_list) if type_list else ''
+        icon_type = type_list[0] if type_list else '기타'
 
         all_complaints.append({
-            'com_id' : complaint.com_id,
+            'com_id': complaint.com_id,
             'title': complaint.com_title,
             'date': complaint.com_reg_date,
-            'type': complaint.com_type,
+            'type_list': type_list,        # 필요하면 데이터 속성에 쓰기
+            'type_display': type_display,  # 화면 출력용 (문자 하나씩 아님)
+            'icon_type': icon_type,        # 아이콘 파일명에 사용
             'location': complaint.com_location,
-            'status': status_name
+            'status': status_name,
+            'content' : complaint.com_contents,
         })
 
     return render(request, 'accounts/complaint_all_list.html', {
@@ -296,8 +308,11 @@ def complaint_all_list(request):
     })
 
 
+
 def custom_login_view(request):
     # 로그인 처리 코드...
     # 로그인 성공 시
     next_url = request.GET.get('next') or 'default_home'
     return redirect(next_url)
+
+

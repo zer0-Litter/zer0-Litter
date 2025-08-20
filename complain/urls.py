@@ -20,5 +20,11 @@ from . import views  # 뷰가 있으면 import
 app_name = 'complain'
 
 urlpatterns = [
-    path('complain_add/', views.complain_add, name='complain_add'),  # 예시, views.home 함수가 있어야 함
+    path('complain_add/', views.complain_add, name='complain_add'),
+    path('reuse/<int:com_id>/', views.complain_reuse, name='complain_reuse'), # 재민원처리
+    path('api/my-complaints/', views.old_complaints_api, name='old_complaints_api'), # 이전민원확인하기
+    path("manage/all/", views.all_complaints_staff, name="all_list"),          # 관리자
+    path("manage/pending/", views.pending_list, name="pending_list"),          # 처리중
+    path("manage/<int:com_id>/complete/", views.mark_complaint_completed, name="mark_completed"),  # 완료처리
+    path("manage/completed/", views.completed_list, name="completed_list"),
 ]
