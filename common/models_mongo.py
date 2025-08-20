@@ -77,3 +77,5 @@ class ChatFiles(Document):
     uploaded_at = DateTimeField()
 
     meta = {'collection': 'chat_files'}
+
+

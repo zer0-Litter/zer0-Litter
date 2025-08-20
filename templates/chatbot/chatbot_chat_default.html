@@ -17,7 +17,7 @@
         <span class="icon">🤖</span>
         <span class="text">
           안녕하세요, <strong>AI 오엘</strong>입니다!<br>
-          아래 버튼 중 선택해 주세요 😊
+          아래의 버튼 중 원하는 버튼을 선택해 주세요 😊
         </span>
       </div>
     </div>
@@ -64,8 +64,27 @@ let current_scenario = null;
 // ---------------- 시나리오 선택 ----------------
 function startScenario(scenarioId) {
   current_scenario = scenarioId;
-  appendMessage('assistant', `시나리오 "${scenarioId}"를 시작합니다.`);
+  let messages = [];
+
+  if (scenarioId === 'trash_finder') {
+    messages = [
+      '쓰레기통 찾기를 시작합니다.',
+      '지도에서 현재 위치를 확인해주세요.'
+    ];
+  } else if (scenarioId === 'complain_submit') {
+    messages = [
+      '민원 제보를 시작하겠습니다.',
+      '어떤 것을 도와드릴까요?'
+    ];
+  } else {
+    messages = [`시나리오 "${scenarioId}"를 시작합니다.`];
+  }
+
+  // 배열을 줄바꿈으로 합쳐서 한 번에 표시
+  appendMessage('assistant', messages.join('\n'));
 }
+
+
 
 // ---------------- 메시지 추가 ----------------
 function appendMessage(role, text, imgUrl=null) {

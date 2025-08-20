@@ -46,14 +46,14 @@
   padding: 1rem;
   overflow-y: auto;
   background-color: #fff;
-  height: 60vh;
+  height: 55vh;
   margin-bottom: 1rem;
   scroll-behavior: smooth;
   font-family: 'Pretendard Variable', sans-serif;
 }
 
 .chat-message {
-  margin-bottom: 0.5rem;
+  margin-bottom: 17px;
   display: flex;
 }
 
