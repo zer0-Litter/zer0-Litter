@@ -53,9 +53,6 @@ def _ensure_upload_dir(path: str):
 def chatbot_api(request):
     print("=== chatbot_api 호출됨 ===")
     logger.warning("chatbot_api 호출됨")
-    print("method:", request.method)
-    print("POST data:", request.POST)
-
     if request.method != "POST":
         return JsonResponse({'error': 'POST 요청만 허용됩니다.'}, status=405)
 
@@ -82,19 +79,13 @@ def chatbot_api(request):
         result = {'response': '챗봇 처리 중 오류가 발생했습니다.', 'session_id': session_id}
 
     # ---------------- chat 기록 저장 ----------------
-    chat_id_str = get_next_chat_id()
     chat_doc = None
+    chat_id_str = get_next_chat_id()
     try:
-        # 위/경도 파싱 방어
-        try:
-            lat = float(request.POST.get('lat')) if request.POST.get('lat') not in (None, '',) else None
-        except ValueError:
-            lat = None
-        try:
-            lon = float(request.POST.get('lon')) if request.POST.get('lon') not in (None, '',) else None
-        except ValueError:
-            lon = None
+        lat = float(request.POST.get('lat')) if request.POST.get('lat') not in (None, '',) else None
+        lon = float(request.POST.get('lon')) if request.POST.get('lon') not in (None, '',) else None
 
+        # ChatHistory에 user 메시지 저장
         chat_doc = ChatHistory(
             chat_id=chat_id_str,
             username=username,
@@ -112,55 +103,53 @@ def chatbot_api(request):
         print(f"ChatHistory 저장 완료: chat_id={chat_id_str}")
     except Exception as e:
         logger.error(f"ChatHistory 저장 실패: {e}", exc_info=True)
-        print(f"ChatHistory 저장 실패: {e}")
+
+    # ---------------- bot 응답 ChatHistory 저장 ----------------
+    try:
+        bot_chat_id = get_next_chat_id()
+        ChatHistory(
+            chat_id=bot_chat_id,
+            username=username,
+            scenario_id=scenario_id,
+            session_id=session_id,
+            role='assistant',
+            content=result.get('response', ''),
+            is_final=False,
+            created_at=datetime.now()
+        ).save()
+    except Exception as e:
+        logger.error(f"Bot ChatHistory 저장 실패: {e}", exc_info=True)
 
     # ---------------- 파일 저장 처리 ----------------
     try:
-        # 프론트는 name="file" 이므로 우선 file, 없으면 files 처리
-        file_list = []
         if 'file' in request.FILES:
-            file_list = request.FILES.getlist('file')
-        elif 'files' in request.FILES:
-            file_list = request.FILES.getlist('files')
-
-        if file_list:
+            files = request.FILES.getlist('file')
             upload_root = "uploads"
-            for f in file_list:
-                try:
-                    file_id = get_next_file_id()
-                    saved_path = os.path.join(upload_root, f"{file_id}_{f.name}")
-                    _ensure_upload_dir(saved_path)
+            for f in files:
+                file_id = get_next_file_id()
+                saved_path = os.path.join(upload_root, f"{file_id}_{f.name}")
+                _ensure_upload_dir(saved_path)
 
-                    with open(saved_path, 'wb+') as dest:
-                        for chunk in f.chunks():
-                            dest.write(chunk)
+                with open(saved_path, 'wb+') as dest:
+                    for chunk in f.chunks():
+                        dest.write(chunk)
 
-                    # ChatFiles.chat_id 는 ReferenceField(ChatHistory)이므로 document 참조를 저장
-                    ChatFiles(
-                        file_id=file_id,
-                        chat_id=chat_doc if chat_doc is not None else None,
-                        file_name=f.name,
-                        file_path=saved_path,
-                        file_type=getattr(f, "content_type", ""),
-                        uploaded_at=datetime.now()
-                    ).save()
-                    print(f"파일 저장 완료: file_id={file_id}, path={saved_path}")
-                except Exception as fe:
-                    logger.error(f"개별 파일 저장 실패: {fe}", exc_info=True)
-                    print(f"파일 저장 실패: {fe}")
+                ChatFiles(
+                    file_id=file_id,
+                    chat_id=chat_doc,  # user 메시지 참조
+                    file_name=f.name,
+                    file_path=saved_path,
+                    file_type=f.content_type,
+                    uploaded_at=datetime.now()
+                ).save()
+                print(f"파일 저장 완료: file_id={file_id}, path={saved_path}")
     except Exception as e:
-        logger.error(f"파일 저장 처리 블록 실패: {e}", exc_info=True)
-        print(f"파일 저장 처리 블록 실패: {e}")
+        logger.error(f"파일 저장 처리 실패: {e}", exc_info=True)
 
-    # ---------------- 응답 반환 (항상 시도) ----------------
-    try:
-        return JsonResponse({
-            'response': result.get('response', ''),
-            'session_id': result.get('session_id', session_id)
-        })
-    except Exception as e:
-        logger.error(f"JsonResponse 생성 실패: {e}", exc_info=True)
-        return JsonResponse({'error': '응답 생성 중 오류 발생'}, status=500)
+    return JsonResponse({
+        'response': result.get('response', ''),
+        'session_id': session_id
+    })
 
 
 # ---------------- 기존 view 유지 ----------------

@@ -36,11 +36,11 @@
     <label for="fileUpload" class="file-label">📷</label>
     <input type="file" id="fileUpload" name="file" accept="image/*" capture="environment" style="display:none;" onchange="uploadFile()">
     <button type="submit">전송</button>
+
   </form>
 </div>
 
 <script>
-
 // ---------------- CSRF 토큰 ----------------
 function getCookie(name) {
   let cookieValue = null;
@@ -101,9 +101,9 @@ function appendMessage(role, text, imgUrl=null) {
   content.className = 'text';
 
   if (imgUrl) {
-    content.innerHTML = `<img src="${imgUrl}" alt="image" style="max-width:100px; max-height:100px;"><br>${text || ''}`;
+      content.innerHTML = `<img src="${imgUrl}" alt="image" style="max-width:100px; max-height:100px;">${text ? '<br>' + text : ''}`;
   } else {
-    content.textContent = text;
+      content.textContent = text;
   }
 
   bubble.appendChild(icon);
@@ -113,89 +113,88 @@ function appendMessage(role, text, imgUrl=null) {
   chatWindow.scrollTop = chatWindow.scrollHeight;
 }
 
-// ---------------- 메시지 전송 ----------------
-function sendMessage() {
-  const input = document.getElementById('messageInput');
-  const message = input.value.trim();
-  if (!message) return false;
-
-  console.log("DEBUG: sendMessage 호출됨, 메시지:", message);
-  appendMessage('user', message);
-  input.value = '';
-
-  // FormData 생성
-  const data = new FormData();
-  data.append('message', message);
-  data.append('session_id', session_id || '');
-  data.append('scenario_id', current_scenario || 'complain_submit');
-
-  // 위치 가져오기 시도
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        console.log("DEBUG: 위치 정보 가져오기 성공", pos.coords);
-        data.append('lat', pos.coords.latitude);
-        data.append('lon', pos.coords.longitude);
-        doFetch(data);
-      },
-      err => {
-        console.warn("DEBUG: 위치 정보 가져오기 실패", err);
-        doFetch(data); // 위치 실패 시에도 호출
-      }
-    );
-  } else {
-    console.warn("DEBUG: 브라우저에서 geolocation 지원 안됨");
-    doFetch(data);
-  }
-
-  return false;
-}
-
-// fetch 호출 함수
+// ---------------- fetch 호출 ----------------
 function doFetch(formData) {
-  console.log("DEBUG: fetch 호출, FormData =", Array.from(formData.entries()));
-
   fetch('/chatbot/chatbot_api/', {
     method: 'POST',
     headers: { 'X-CSRFToken': csrftoken },
     body: formData
   })
-  .then(resp => {
-    console.log("DEBUG: fetch 응답 상태 =", resp.status);
-    return resp.json();
-  })
+  .then(resp => resp.json())
   .then(json => {
-    console.log("DEBUG: fetch JSON 응답 =", json);
     if (json.response) appendMessage('assistant', json.response);
     if (json.session_id) session_id = json.session_id;
   })
   .catch(err => {
-    console.error("DEBUG: fetch 에러:", err);
+    console.error("fetch 에러:", err);
     appendMessage('assistant', '서버와 통신 중 오류가 발생했습니다.');
   });
 }
 
-
-// ---------------- 이미지 업로드 ----------------
+// ---------------- 이미지 업로드 및 전송 ----------------
 function uploadFile() {
   const fileInput = document.getElementById('fileUpload');
   const file = fileInput.files[0];
   if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    console.log("DEBUG: 파일 업로드 미리보기 생성");
-    appendMessage('user', '', e.target.result);
-  };
-  reader.readAsDataURL(file);
+  // 미리보기 표시
+  appendMessage('user', null, URL.createObjectURL(file));
+
+  // FormData 생성
+  const data = new FormData();
+  data.append('file', file);
+  data.append('message', '');
+  data.append('session_id', session_id || '');
+  data.append('scenario_id', current_scenario || 'complain_submit');
+
+  // 위치 정보 포함
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        data.append('lat', pos.coords.latitude);
+        data.append('lon', pos.coords.longitude);
+        doFetch(data);
+      },
+      err => doFetch(data)
+    );
+  } else {
+    doFetch(data);
+  }
+
+  fileInput.value = ''; // 파일 선택 초기화
 }
 
-// ---------------- form submit 이벤트 ----------------
+// ---------------- 텍스트 메시지 전송 ----------------
 document.getElementById('chatForm').addEventListener('submit', function(e) {
   e.preventDefault();
-  sendMessage();
+  const input = document.getElementById('messageInput');
+  const messageText = input.value.trim();
+  if (!messageText) return;
+
+  appendMessage('user', messageText);
+
+  const data = new FormData();
+  data.append('message', messageText);
+  data.append('session_id', session_id || '');
+  data.append('scenario_id', current_scenario || 'complain_submit');
+
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        data.append('lat', pos.coords.latitude);
+        data.append('lon', pos.coords.longitude);
+        doFetch(data);
+      },
+      err => doFetch(data)
+    );
+  } else {
+    doFetch(data);
+  }
+
+  input.value = '';
 });
 </script>
+
 
 
 {% endblock %}
