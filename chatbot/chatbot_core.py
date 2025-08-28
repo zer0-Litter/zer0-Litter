@@ -1,5 +1,6 @@
 import os, re
 from datetime import datetime, timezone
+import time
 from pymongo import MongoClient, ReturnDocument
 from dotenv import load_dotenv
 from langchain.chat_models import ChatOpenAI
@@ -12,7 +13,7 @@ client = MongoClient(MONGO_URI)
 db = client['complaints_db']
 COLLECTIONS = {
     "history": db['chat_history'],
-    "files": db['chat_files'],
+    "files": db['chat_files'],  # 발화별 저장
     "complaints": db['complaints']
 }
 
@@ -25,14 +26,6 @@ trash_prompt = ChatPromptTemplate.from_messages([
     HumanMessagePromptTemplate.from_template("사용자 질문: {user_input}")
 ])
 trash_chain = LLMChain(llm=llm, prompt=trash_prompt)
-
-complain_prompt = ChatPromptTemplate.from_messages([
-    SystemMessagePromptTemplate.from_template(
-        "당신은 민원 접수 챗봇입니다. 간단한 인사말은 답변하고, 신고 내용 기반으로 필요한 정보를 확인하세요."
-    ),
-    HumanMessagePromptTemplate.from_template("사용자 입력: {user_input}\n챗봇 질문:")
-])
-complain_chain = LLMChain(llm=llm, prompt=complain_prompt)
 
 GREETINGS = ["안녕하세요", "안녕", "hi", "hello", "반갑습니다", "안녕하십니까"]
 def is_greeting(text):
@@ -87,6 +80,15 @@ def save_chat_history(username, scenario_id, session_id, role, content, is_final
     }
     COLLECTIONS["history"].insert_one(record)
 
+def save_chat_file(session_id, role, message):
+    """각 발화를 chat_files에 저장"""
+    COLLECTIONS["files"].insert_one({
+        "session_id": session_id,
+        "role": role,
+        "message": message,
+        "timestamp": datetime.now(timezone.utc)
+    })
+
 def save_complaint(username, complaint_data):
     complaint_data["username"] = username
     complaint_data["com_reg_date"] = datetime.now(timezone.utc)
@@ -98,32 +100,56 @@ def save_complaint(username, complaint_data):
 REQUIRED_FIELDS = ["com_type", "com_contents"]
 complaint_cache = {}
 
-def infer_com_type_with_llm(user_input):
+def infer_com_type_with_llm(user_input, chat_history=None):
+    """LLM을 통해 com_type을 추론 (맥락 반영 가능)"""
+    context = ""
+    if chat_history:
+        context = "\n".join([f"{msg['role']}: {msg['message']}" for msg in chat_history[-5:]])
+
     prompt = ChatPromptTemplate.from_messages([
         SystemMessagePromptTemplate.from_template(
-            "사용자 입력을 바탕으로 com_type을 '청소요청', '수리요청', '추가요청', '기타민원' 중 하나로 분류하세요."
+            "다음 대화를 참고하여 사용자가 제기한 민원을 "
+            "'청소요청', '수리요청', '추가요청', '기타민원' 중 하나로 분류하세요. "
+            "가능한 경우 유형만 정확히 반환하세요. 모를 경우 가장 가능성 높은 항목 하나를 제안하세요."
         ),
-        HumanMessagePromptTemplate.from_template("{text}")
+        HumanMessagePromptTemplate.from_template(f"대화 내용:\n{context}\n\n최신 발화: {{text}}")
     ])
     chain = LLMChain(llm=llm, prompt=prompt)
-    raw = chain.run({"text": user_input})
+    result = chain.invoke({"text": user_input})
+
+    # LLMChain 결과 안전하게 파싱
+    if isinstance(result, dict):
+        raw = result.get("text") or result.get("output") or str(result)
+    else:
+        raw = str(result)
+
     return truncate_to_full_sentence(raw).strip()
 
-def extract_fields(user_input):
+def extract_fields(user_input, chat_history=None):
     data = {}
-    com_type = infer_com_type_with_llm(user_input).replace(" ", "")
-    if com_type in ["청소요청", "수리요청", "추가요청", "기타민원"]:
-        data["com_type"] = [com_type]
+    raw_com_type = infer_com_type_with_llm(user_input, chat_history)
+    cleaned = raw_com_type.replace(" ", "")
+
+    # 부분 일치 허용
+    valid_types = ["청소요청", "수리요청", "추가요청", "기타민원"]
+    for t in valid_types:
+        if t in cleaned:
+            data["com_type"] = t
+            break
+    else:
+        data["com_type"] = None
+
     data["com_contents"] = user_input
     return data
+
 
 def is_complete(complaint_data):
     if not complaint_data: return False
     return all(complaint_data.get(f) for f in REQUIRED_FIELDS)
 
-def handle_complain_submit(user_input, username, session_id):
+def handle_complain_submit(user_input, username, session_id, chat_history=None):
     cached = complaint_cache.get(session_id, {})
-    extracted = extract_fields(user_input)
+    extracted = extract_fields(user_input, chat_history)
     cached.update(extracted)
 
     if is_complete(cached):
@@ -134,35 +160,50 @@ def handle_complain_submit(user_input, username, session_id):
     else:
         complaint_cache[session_id] = cached
         missing = [f for f in REQUIRED_FIELDS if f not in cached or not cached[f]]
-        response = f"추가 정보가 필요합니다: {', '.join(missing)}"
+
+        if "com_type" in missing:
+            response = (
+                f"쓰레기와 관련된 민원으로 보입니다. "
+                "어떤 유형인가요? (청소요청, 수리요청, 추가요청, 기타민원)"
+            )
+        else:
+            response = f"추가 정보가 필요합니다: {', '.join(missing)}"
 
     save_chat_history(username, "complain_submit", session_id, "bot", response)
+    save_chat_file(session_id, "assistant", response)
     return response
 
 def handle_trash_finder(user_input, username, session_id):
     response = trash_chain.run({"user_input": user_input})
-    save_chat_history(username, "trash_finder", session_id, "bot", response)
-    return truncate_to_full_sentence(response)
+    final_response = truncate_to_full_sentence(response)
+    save_chat_history(username, "trash_finder", session_id, "bot", final_response)
+    save_chat_file(session_id, "assistant", final_response)
+    return final_response
 
-def chatbot_router(user_input, username, session_id=None, scenario_id=None):
+def chatbot_router(user_input, username, session_id=None, scenario_id=None, start_time=None):
+    start_time = time.time()  # 반드시 함수 시작하자마자 초기화
     if session_id is None:
         session_id = generate_session_id()
     if scenario_id is None:
         scenario_id = classify_scenario(user_input)
 
     save_chat_history(username, scenario_id, session_id, "user", user_input)
+    save_chat_file(session_id, "user", user_input)
 
     if is_greeting(user_input):
         response = "안녕하세요! 무엇을 도와드릴까요?"
         save_chat_history(username, scenario_id, session_id, "bot", response)
+        save_chat_file(session_id, "bot", response)
         return {"response": response, "session_id": session_id}
 
     if scenario_id == "complain_submit":
         response = handle_complain_submit(user_input, username, session_id)
     elif scenario_id == "trash_finder":
-        response = handle_trash_finder(user_input, session_id, username)
+        response = handle_trash_finder(user_input, username, session_id)
     else:
         response = "지원하지 않는 질문입니다."
         save_chat_history(username, scenario_id, session_id, "bot", response)
-
+        save_chat_file(session_id, "bot", response)
+    print(f"[DEBUG] chatbot_router total processing time: {time.time() - start_time:.2f}s")
+    
     return {"response": response, "session_id": session_id}
