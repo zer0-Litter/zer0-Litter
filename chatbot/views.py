@@ -45,9 +45,6 @@ def get_next_file_id():
         logger.error(f"file_id 생성 실패: {e}")
         return f"file_{uuid4()}"
 
-def _ensure_upload_dir(path: str):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-
 # ---------------- chatbot_api ----------------
 @csrf_exempt
 def chatbot_api(request):
@@ -109,7 +106,7 @@ def chatbot_api(request):
     except Exception as e:
         logger.error(f"ChatHistory(user) 저장 실패: {e}", exc_info=True)
 
-    # -------- 파일 저장 (실제 파일만 chat_files 컬렉션) --------
+    # -------- 파일 저장 (ChatFiles 컬렉션) --------
     try:
         files = []
         if 'file' in request.FILES:
@@ -118,25 +115,21 @@ def chatbot_api(request):
             files = request.FILES.getlist('files')
 
         if files:
-            upload_root = "uploads"
             for f in files:
                 file_id = get_next_file_id()
-                saved_path = os.path.join(upload_root, f"{file_id}_{f.name}")
-                _ensure_upload_dir(saved_path)
-
-                with open(saved_path, 'wb+') as dest:
-                    for chunk in f.chunks():
-                        dest.write(chunk)
+                f.seek(0)  # 파일 포인터를 맨 앞으로
+                binary_data = f.read()  # 전체 읽기
 
                 ChatFiles(
-                    file_id=file_id,             # 반드시 값 있음
-                    chat_id=chat_doc,            # 방금 저장한 user 메세지 참조
+                    file_id=file_id,
+                    chat_id=chat_doc,
                     file_name=f.name,
-                    file_path=saved_path,
+                    file_data=binary_data,
                     file_type=getattr(f, "content_type", ""),
                     uploaded_at=datetime.now()
                 ).save()
-                print(f"파일 저장 완료: file_id={file_id}, path={saved_path}")
+                print(f"파일 저장 완료: file_id={file_id}")
+
     except Exception as e:
         logger.error(f"파일 저장 처리 실패: {e}", exc_info=True)
 
@@ -156,11 +149,42 @@ def chatbot_api(request):
     except Exception as e:
         logger.error(f"ChatHistory(bot) 저장 실패: {e}", exc_info=True)
 
+    # -------- Complaints 자동 생성 --------
+    try:
+        # com_type, lat, lon 모두 있어야 Complaints 생성
+        if chat_doc and chat_doc.latitude and chat_doc.longitude and request.POST.get("com_type"):
+            from common.models_mongo import Complaints  # 지연 로딩
+
+            complaint_data = {
+                "com_id": Counter.objects(name="complaint").modify(
+                    upsert=True, new=True, inc__seq=1
+                ).seq,
+                "username": username,
+                "com_type": request.POST.get("com_type"),
+                "lat": chat_doc.latitude,
+                "lon": chat_doc.longitude,
+                "com_title": user_input or "자동 생성 민원",
+                "com_contents": user_input,
+                "com_reg_date": datetime.now()
+            }
+
+            # 최근 ChatFiles 2개 첨부
+            related_files = ChatFiles.objects(chat_id=chat_doc).order_by("-uploaded_at")[:2]
+            if related_files:
+                if len(related_files) >= 1:
+                    complaint_data["com_pic1"] = related_files[0].file_data
+                if len(related_files) >= 2:
+                    complaint_data["com_pic2"] = related_files[1].file_data
+
+            Complaints(**complaint_data).save()
+            print(f"Complaints 저장 완료: com_id={complaint_data['com_id']}")
+    except Exception as e:
+        logger.error(f"Complaints 자동 생성 실패: {e}", exc_info=True)
+
     return JsonResponse({
         'response': result.get('response', ''),
         'session_id': session_id
     })
-
 
 # ---------------- 기존 view 유지 ----------------
 @login_required

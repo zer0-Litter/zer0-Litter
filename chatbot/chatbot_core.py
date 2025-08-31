@@ -144,24 +144,24 @@ def handle_complain_submit(user_input, username, session_id, chat_history=None):
     extracted = extract_fields(user_input, chat_history)
     cached.update(extracted)
 
-    if is_complete(cached):
-        final_data = {**cached, "status_id": 1}
-        save_complaint(username, final_data)
+    if all(k in cached and cached[k] for k in ("com_type", "lat", "lon")):
+        # save_complaint() 호출 제거 → views.py에서 자동 생성
         complaint_cache.pop(session_id, None)
-        response = f"신고가 접수되었습니다. 내용: {cached}"
+        response = f"신고가 접수될 준비가 되었습니다: {cached}"
     else:
         complaint_cache[session_id] = cached
-        missing = [f for f in REQUIRED_FIELDS if f not in cached or not cached[f]]
-
+        missing = [f for f in ("com_type", "lat", "lon") if f not in cached or not cached[f]]
         if "com_type" in missing:
             response = (
-                f"쓰레기와 관련된 민원으로 보입니다. "
+                "쓰레기와 관련된 민원으로 보입니다. "
                 "어떤 유형인가요? (청소요청, 수리요청, 추가요청, 기타민원)"
             )
         else:
             response = f"추가 정보가 필요합니다: {', '.join(missing)}"
 
     return response
+
+
 
 def handle_trash_finder(user_input, username, session_id):
     response = trash_chain.run({"user_input": user_input})

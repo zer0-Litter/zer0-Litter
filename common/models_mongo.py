@@ -1,4 +1,4 @@
-from mongoengine import FloatField, BooleanField, DecimalField, DictField, StringField
+from mongoengine import FloatField, BooleanField, DecimalField, DictField, StringField, FileField
 from mongoengine import Document, StringField, DateTimeField, DateField
 from mongoengine import IntField, BinaryField, ReferenceField
 
@@ -72,7 +72,7 @@ class ChatFiles(Document):
     file_id = StringField(unique=True, required=True, sparse=True, db_field='file_id')
     chat_id = ReferenceField(ChatHistory, required=True)
     file_name = StringField(max_length=255)
-    file_path = StringField(max_length=255)
+    file_data = BinaryField()
     file_type = StringField(max_length=50)
     uploaded_at = DateTimeField()
 
