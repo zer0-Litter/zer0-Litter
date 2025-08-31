@@ -1,4 +1,4 @@
-from mongoengine import FloatField, BooleanField, DecimalField, DictField, StringField
+from mongoengine import FloatField, BooleanField, DecimalField, DictField, StringField, FileField
 from mongoengine import Document, StringField, DateTimeField, DateField
 from mongoengine import IntField, BinaryField, ReferenceField
 
@@ -53,7 +53,7 @@ class ReComplaints(Document):
 
 
 class ChatHistory(Document):
-    chat_id = StringField(primary_key=True)  # AutoField 대체
+    chat_id = StringField(unique=True, required=True, db_field='chat_id')  # AutoField 대체
     username = StringField(max_length=100)
     scenario_id = StringField(max_length=255)
     session_id = StringField(max_length=255)
@@ -69,11 +69,13 @@ class ChatHistory(Document):
 
 
 class ChatFiles(Document):
-    file_id = StringField(primary_key=True)
+    file_id = StringField(unique=True, required=True, sparse=True, db_field='file_id')
     chat_id = ReferenceField(ChatHistory, required=True)
     file_name = StringField(max_length=255)
-    file_path = StringField(max_length=255)
+    file_data = BinaryField()
     file_type = StringField(max_length=50)
     uploaded_at = DateTimeField()
 
     meta = {'collection': 'chat_files'}
+
+

@@ -99,6 +99,7 @@ main {
   padding-bottom: 80px;  /* 하단 네비가 가리지 않게 여유 확보 */
 }
 
+
 /* 하단 네비 고정 */
 .bottom-nav-modern {
    position: absolute; /* 변경 */

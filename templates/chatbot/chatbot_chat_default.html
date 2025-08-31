@@ -1,65 +1,91 @@
-<!-- chatbot.html -->
 {% extends 'nav_base.html' %}
 {% load static %}
 
 {% block title %}챗봇{% endblock %}
 
 {% block extra_head %}
-  <link rel="stylesheet" href="{% static 'css/chatbot.css' %}">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css" />
+<link rel="stylesheet" href="{% static 'css/chatbot.css' %}">
 {% endblock %}
 
 {% block content %}
 <div class="chatbot-container">
-  <!-- 시나리오 선택 버튼 -->
-  <div class="scenario-buttons">
-    <button class="scenario-btn" onclick="startScenario('trash_finder')">
-      🗑️ 쓰레기통 찾기
-    </button>
-    <button class="scenario-btn" onclick="startScenario('complain_report')">
-      📝 민원 제보하기
-    </button>
-  </div>
 
-  <!-- 채팅창 -->
   <div class="chat-window" id="chatWindow">
-    <!-- 메시지 예시 -->
     <div class="chat-message assistant">
       <div class="message-bubble">
         <span class="icon">🤖</span>
-        <span class="text">안녕하세요. AI오엘입니다! <br> 무엇을 도와드릴까요?</span>
+        <span class="text">
+          안녕하세요, <strong>AI 오엘</strong>입니다!<br>
+          아래의 버튼 중 원하는 버튼을 선택해 주세요 😊
+        </span>
       </div>
     </div>
-    <div class="chat-message user">
-      <div class="message-bubble">
-        <span class="icon">🙋‍♀️</span>
-        <span class="text">이 근처에 쓰레기통 있어?</span>
-      </div>
-    </div>
-    <div class="chat-message assistant">
-      <div class="message-bubble">
-        <span class="icon">🤖</span>
-        <span class="text">150m 근처에 쓰레기통이 2개 있습니다!</span>
-      </div>
+
+    <div class="scenario-buttons" style="margin-top: 10px;">
+      <button class="scenario-btn" onclick="startScenario('trash_finder')">🗑️ 쓰레기통 찾기</button>
+      <button class="scenario-btn" onclick="startScenario('complain_submit')">📝 민원 제보하기</button>
     </div>
   </div>
 
-  <!-- 메시지 입력 -->
-  <form class="chat-input" id="chatForm" method="post" enctype="multipart/form-data" onsubmit="return sendMessage()">
+  <form class="chat-input" id="chatForm">
     {% csrf_token %}
-    <input type="text" name="message" id="messageInput" placeholder="메시지를 입력하세요..." autocomplete="off" />
+    <input type="text" id="messageInput" placeholder="메시지를 입력하세요..." autocomplete="off" />
+    <input type="hidden" id="latitudeInput" name="latitude">
+    <input type="hidden" id="longitudeInput" name="longitude">
     <label for="fileUpload" class="file-label">📷</label>
-    <input type="file" id="fileUpload" name="file" accept="image/*" capture="environment" style="display: none;" onchange="uploadFile()">
+    <input type="file" id="fileUpload" name="file" accept="image/*" capture="environment" style="display:none;" onchange="uploadFile()">
     <button type="submit">전송</button>
+
   </form>
 </div>
 
 <script>
+// ---------------- CSRF 토큰 ----------------
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+      cookie = cookie.trim();
+      if (cookie.startsWith(name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+const csrftoken = getCookie('csrftoken');
+
+// ---------------- 세션, 시나리오 ----------------
+let session_id = null;
+let current_scenario = null;
+
+// ---------------- 시나리오 선택 ----------------
 function startScenario(scenarioId) {
-  appendMessage('assistant', `시나리오 "${scenarioId}"를 시작합니다.`);
-  // TODO: 서버 요청으로 시나리오 초기화 가능
+  current_scenario = scenarioId;
+  let messages = [];
+
+  if (scenarioId === 'trash_finder') {
+    messages = [
+      '쓰레기통 찾기를 시작합니다.',
+      '지도에서 현재 위치를 확인해주세요.'
+    ];
+  } else if (scenarioId === 'complain_submit') {
+    messages = [
+      '민원 제보를 시작하겠습니다.',
+      '어떤 것을 도와드릴까요?'
+    ];
+  } else {
+    messages = [`시나리오 "${scenarioId}"를 시작합니다.`];
+  }
+
+  appendMessage('assistant', messages.join('\n'));
 }
 
-function appendMessage(role, text, imgUrl) {
+// ---------------- 메시지 추가 ----------------
+function appendMessage(role, text, imgUrl=null) {
   const chatWindow = document.getElementById('chatWindow');
   const msgDiv = document.createElement('div');
   msgDiv.className = `chat-message ${role}`;
@@ -73,10 +99,11 @@ function appendMessage(role, text, imgUrl) {
 
   const content = document.createElement('span');
   content.className = 'text';
+
   if (imgUrl) {
-    content.innerHTML = `<img src="${imgUrl}" alt="image" style="max-width:100px; max-height:100px;"><br>${text || ''}`;
+      content.innerHTML = `<img src="${imgUrl}" alt="image" style="max-width:100px; max-height:100px;">${text ? '<br>' + text : ''}`;
   } else {
-    content.textContent = text;
+      content.textContent = text;
   }
 
   bubble.appendChild(icon);
@@ -86,50 +113,88 @@ function appendMessage(role, text, imgUrl) {
   chatWindow.scrollTop = chatWindow.scrollHeight;
 }
 
-function sendMessage() {
-  const input = document.getElementById('messageInput');
-  const message = input.value.trim();
-  if (!message) return false;
-
-  appendMessage('user', message);
-  input.value = '';
-
-  const lowerMsg = message.toLowerCase();
-  const greetingResponses = {
-    '안녕': '안녕하세요! 무엇을 도와드릴까요?',
-    'hello': 'Hello! How can I help you?',
-    '고마워': '천만에요! 도움이 되었다니 기뻐요 😊',
-    '감사': '감사합니다! 언제든지 도와드릴게요.',
-    '잘가': '안녕히 가세요! 또 만나요 👋',
-    'bye': 'Goodbye! Take care!'
-  };
-
-  for (const key in greetingResponses) {
-    if (lowerMsg.includes(key)) {
-      setTimeout(() => {
-        appendMessage('assistant', greetingResponses[key]);
-      }, 600);
-      return false;
-    }
-  }
-
-  // TODO: 서버에 메시지 전송하고 응답 처리
-  return false;
+// ---------------- fetch 호출 ----------------
+function doFetch(formData) {
+  fetch('/chatbot/chatbot_api/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': csrftoken },
+    body: formData
+  })
+  .then(resp => resp.json())
+  .then(json => {
+    if (json.response) appendMessage('assistant', json.response);
+    if (json.session_id) session_id = json.session_id;
+  })
+  .catch(err => {
+    console.error("fetch 에러:", err);
+    appendMessage('assistant', '서버와 통신 중 오류가 발생했습니다.');
+  });
 }
 
-
+// ---------------- 이미지 업로드 및 전송 ----------------
 function uploadFile() {
   const fileInput = document.getElementById('fileUpload');
   const file = fileInput.files[0];
   if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = function (e) {
-    appendMessage('user', '', e.target.result);
-  };
-  reader.readAsDataURL(file);
+  // 미리보기 표시
+  appendMessage('user', null, URL.createObjectURL(file));
 
-  // TODO: FormData를 이용해 서버에 전송 처리
+  // FormData 생성
+  const data = new FormData();
+  data.append('file', file);
+  data.append('message', '');
+  data.append('session_id', session_id || '');
+  data.append('scenario_id', current_scenario || 'complain_submit');
+
+  // 위치 정보 포함
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        data.append('lat', pos.coords.latitude);
+        data.append('lon', pos.coords.longitude);
+        doFetch(data);
+      },
+      err => doFetch(data)
+    );
+  } else {
+    doFetch(data);
+  }
+
+  fileInput.value = ''; // 파일 선택 초기화
 }
+
+// ---------------- 텍스트 메시지 전송 ----------------
+document.getElementById('chatForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const input = document.getElementById('messageInput');
+  const messageText = input.value.trim();
+  if (!messageText) return;
+
+  appendMessage('user', messageText);
+
+  const data = new FormData();
+  data.append('message', messageText);
+  data.append('session_id', session_id || '');
+  data.append('scenario_id', current_scenario || 'complain_submit');
+
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        data.append('lat', pos.coords.latitude);
+        data.append('lon', pos.coords.longitude);
+        doFetch(data);
+      },
+      err => doFetch(data)
+    );
+  } else {
+    doFetch(data);
+  }
+
+  input.value = '';
+});
 </script>
+
+
+
 {% endblock %}
