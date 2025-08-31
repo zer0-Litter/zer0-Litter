@@ -60,6 +60,13 @@ def chatbot_api(request):
     user_input = (request.POST.get('message') or '').strip()
     scenario_id = request.POST.get('scenario_id') or 'default'
 
+    # 파일 유무 체크
+    has_file = ('file' in request.FILES) or ('files' in request.FILES)
+
+    # ⚠️ 빈 메시지 + 파일 없음이면 아무 것도 안 함(세션 발급 X)
+    if not user_input and not has_file:
+        return JsonResponse({'response': '', 'session_id': request.POST.get('session_id') or ''})
+
     # session_id 처리
     session_id = request.POST.get('session_id')
     if not session_id:
@@ -70,7 +77,7 @@ def chatbot_api(request):
 
     print(f"username={username}, input={user_input}, scenario_id={scenario_id}, session_id={session_id}")
 
-    # ---------------- router 호출 ----------------
+    # -------- Router 호출 (저장은 라우터가 하지 않도록 위에서 변경) --------
     try:
         result = chatbot_router(user_input, username, session_id, scenario_id)
         print("router 결과:", result)
@@ -78,19 +85,17 @@ def chatbot_api(request):
         logger.error(f"router 호출 실패: {e}", exc_info=True)
         result = {'response': '챗봇 처리 중 오류가 발생했습니다.', 'session_id': session_id}
 
-    # ---------------- chat 기록 저장 ----------------
+    # -------- ChatHistory: user 메시지 1회 저장 --------
     chat_doc = None
-    chat_id_str = get_next_chat_id()
     try:
         lat = float(request.POST.get('lat')) if request.POST.get('lat') not in (None, '',) else None
         lon = float(request.POST.get('lon')) if request.POST.get('lon') not in (None, '',) else None
 
-        # ChatHistory에 user 메시지 저장
         chat_doc = ChatHistory(
-            chat_id=chat_id_str,
+            chat_id=get_next_chat_id(),
             username=username,
             scenario_id=scenario_id,
-            session_id=result.get('session_id', session_id),
+            session_id=session_id,  # result의 session_id와 동일
             role='user',
             content=user_input,
             latitude=lat,
@@ -100,30 +105,19 @@ def chatbot_api(request):
             created_at=datetime.now()
         )
         chat_doc.save()
-        print(f"ChatHistory 저장 완료: chat_id={chat_id_str}")
+        print(f"ChatHistory 저장 완료(user): {chat_doc.chat_id}")
     except Exception as e:
-        logger.error(f"ChatHistory 저장 실패: {e}", exc_info=True)
+        logger.error(f"ChatHistory(user) 저장 실패: {e}", exc_info=True)
 
-    # ---------------- bot 응답 ChatHistory 저장 ----------------
+    # -------- 파일 저장 (실제 파일만 chat_files 컬렉션) --------
     try:
-        bot_chat_id = get_next_chat_id()
-        ChatHistory(
-            chat_id=bot_chat_id,
-            username=username,
-            scenario_id=scenario_id,
-            session_id=session_id,
-            role='assistant',
-            content=result.get('response', ''),
-            is_final=False,
-            created_at=datetime.now()
-        ).save()
-    except Exception as e:
-        logger.error(f"Bot ChatHistory 저장 실패: {e}", exc_info=True)
-
-    # ---------------- 파일 저장 처리 ----------------
-    try:
+        files = []
         if 'file' in request.FILES:
             files = request.FILES.getlist('file')
+        elif 'files' in request.FILES:
+            files = request.FILES.getlist('files')
+
+        if files:
             upload_root = "uploads"
             for f in files:
                 file_id = get_next_file_id()
@@ -135,16 +129,32 @@ def chatbot_api(request):
                         dest.write(chunk)
 
                 ChatFiles(
-                    file_id=file_id,
-                    chat_id=chat_doc,  # user 메시지 참조
+                    file_id=file_id,             # 반드시 값 있음
+                    chat_id=chat_doc,            # 방금 저장한 user 메세지 참조
                     file_name=f.name,
                     file_path=saved_path,
-                    file_type=f.content_type,
+                    file_type=getattr(f, "content_type", ""),
                     uploaded_at=datetime.now()
                 ).save()
                 print(f"파일 저장 완료: file_id={file_id}, path={saved_path}")
     except Exception as e:
         logger.error(f"파일 저장 처리 실패: {e}", exc_info=True)
+
+    # -------- ChatHistory: bot 응답 1회 저장 --------
+    try:
+        ChatHistory(
+            chat_id=get_next_chat_id(),
+            username=username,
+            scenario_id=scenario_id,
+            session_id=session_id,
+            role='assistant',
+            content=result.get('response', ''),
+            is_final=False,
+            created_at=datetime.now()
+        ).save()
+        print("ChatHistory 저장 완료(bot)")
+    except Exception as e:
+        logger.error(f"ChatHistory(bot) 저장 실패: {e}", exc_info=True)
 
     return JsonResponse({
         'response': result.get('response', ''),

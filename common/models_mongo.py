@@ -69,7 +69,7 @@ class ChatHistory(Document):
 
 
 class ChatFiles(Document):
-    file_id = StringField(unique=True, required=True, db_field='file_id')
+    file_id = StringField(unique=True, required=True, sparse=True, db_field='file_id')
     chat_id = ReferenceField(ChatHistory, required=True)
     file_name = StringField(max_length=255)
     file_path = StringField(max_length=255)

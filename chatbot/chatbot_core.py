@@ -80,14 +80,6 @@ def save_chat_history(username, scenario_id, session_id, role, content, is_final
     }
     COLLECTIONS["history"].insert_one(record)
 
-def save_chat_file(session_id, role, message):
-    """각 발화를 chat_files에 저장"""
-    COLLECTIONS["files"].insert_one({
-        "session_id": session_id,
-        "role": role,
-        "message": message,
-        "timestamp": datetime.now(timezone.utc)
-    })
 
 def save_complaint(username, complaint_data):
     complaint_data["username"] = username
@@ -169,31 +161,26 @@ def handle_complain_submit(user_input, username, session_id, chat_history=None):
         else:
             response = f"추가 정보가 필요합니다: {', '.join(missing)}"
 
-    save_chat_history(username, "complain_submit", session_id, "bot", response)
-    save_chat_file(session_id, "assistant", response)
     return response
 
 def handle_trash_finder(user_input, username, session_id):
     response = trash_chain.run({"user_input": user_input})
     final_response = truncate_to_full_sentence(response)
-    save_chat_history(username, "trash_finder", session_id, "bot", final_response)
-    save_chat_file(session_id, "assistant", final_response)
+
     return final_response
 
-def chatbot_router(user_input, username, session_id=None, scenario_id=None, start_time=None):
-    start_time = time.time()  # 반드시 함수 시작하자마자 초기화
+def chatbot_router(user_input, username, session_id=None, scenario_id=None):
+    start_time = time.time()
+
     if session_id is None:
         session_id = generate_session_id()
     if scenario_id is None:
         scenario_id = classify_scenario(user_input)
 
-    save_chat_history(username, scenario_id, session_id, "user", user_input)
-    save_chat_file(session_id, "user", user_input)
-
+    # 인사만 처리 (저장은 views에서 함)
     if is_greeting(user_input):
         response = "안녕하세요! 무엇을 도와드릴까요?"
-        save_chat_history(username, scenario_id, session_id, "bot", response)
-        save_chat_file(session_id, "bot", response)
+        print(f"[DEBUG] chatbot_router total processing time: {time.time() - start_time:.2f}s")
         return {"response": response, "session_id": session_id}
 
     if scenario_id == "complain_submit":
@@ -202,8 +189,6 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None, star
         response = handle_trash_finder(user_input, username, session_id)
     else:
         response = "지원하지 않는 질문입니다."
-        save_chat_history(username, scenario_id, session_id, "bot", response)
-        save_chat_file(session_id, "bot", response)
+
     print(f"[DEBUG] chatbot_router total processing time: {time.time() - start_time:.2f}s")
-    
     return {"response": response, "session_id": session_id}
