@@ -124,6 +124,9 @@ mongo_db = mongo_client[MONGO_DB_NAME]
 #KAKAO API
 KAKAO_MAP_KEY = os.getenv("KAKAO_MAP_API_KEY")
 
+# OPENAI API
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
