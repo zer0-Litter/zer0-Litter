@@ -31,4 +31,5 @@ urlpatterns = [
     path('mypage/update/', views.mypage_update, name='mypage_update'),
     path('delete/', views.delete_user, name='delete_user'),
     path('complaint_all/', views.complaint_all_list, name='complaint_all'),
+    path('api/complaints/update/', views.complaint_update_api, name='complain_update_api'),
 ]

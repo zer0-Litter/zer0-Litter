@@ -6,6 +6,9 @@ from django.views.decorators.http import require_GET, require_POST
 from common.models_mongo import Complaints, ComplaintStatus, Counter, ReComplaints
 from django.http import Http404, JsonResponse
 from uuid import uuid4
+from mongoengine.queryset.visitor import Q
+from datetime import datetime, timedelta
+from django.core.paginator import Paginator
 
 def init_or_fix_all_counters():
     # --- complaints의 com_id 카운터 초기화 ---
@@ -209,37 +212,29 @@ def old_complaints_api(request):
 @staff_member_required
 @require_GET
 def all_complaints_staff(request):
-    """스태프: 전체 민원 + 최신 상태/변경자/시각 함께 표기"""
-    docs = list(Complaints.objects.order_by("-com_reg_date"))
-    items = []
-    for c in docs:
-        last = ComplaintStatus.objects(com_id=c.com_id).order_by("-updated_at", "-status_id").first()
-        items.append({"doc": c, "last": last})  # last가 None이면 '이력없음/처리중' 취급
-    return render(request, "complain/staff_all_list.html", {"items": items})
+    page_obj, query = build_staff_items(request, force_status=None)
+    return render(request, "complain/staff_all_list.html", {
+        "page_obj": page_obj,
+        "query": query,
+    })
 
 @staff_member_required
 @require_GET
 def pending_list(request):
-    """스태프: 최신 상태가 '처리중'(또는 이력 없음)인 민원만"""
-    docs = list(Complaints.objects.order_by("-com_reg_date"))
-    items = []
-    for c in docs:
-        last = ComplaintStatus.objects(com_id=c.com_id).order_by("-updated_at", "-status_id").first()
-        if not last or last.status_name == "처리중":
-            items.append({"doc": c, "last": last})
-    return render(request, "complain/staff_pending_list.html", {"items": items})
+    page_obj, query = build_staff_items(request, force_status="처리중")
+    return render(request, "complain/staff_pending_list.html", {
+        "page_obj": page_obj,
+        "query": query,
+    })
 
 @staff_member_required
 @require_GET
 def completed_list(request):
-    """스태프: 최신 상태가 '처리완료'인 민원만"""
-    docs = list(Complaints.objects.order_by("-com_reg_date"))
-    items = []
-    for c in docs:
-        last = ComplaintStatus.objects(com_id=c.com_id).order_by("-updated_at", "-status_id").first()
-        if last and last.status_name == "처리완료":
-            items.append({"doc": c, "last": last})
-    return render(request, "complain/staff_completed_list.html", {"items": items})
+    page_obj, query = build_staff_items(request, force_status="처리완료")
+    return render(request, "complain/staff_completed_list.html", {
+        "page_obj": page_obj,
+        "query": query,
+    })
 
 @staff_member_required
 @require_POST
@@ -267,3 +262,73 @@ def mark_complaint_completed(request, com_id: int):
 
 
     return redirect(next_url or "complain:pending_list")
+
+# --- 공통 파서 ---
+def _parse_date(s):
+    try:
+        return datetime.strptime(s, "%Y-%m-%d")
+    except Exception:
+        return None
+
+def _parse_int(s):
+    try:
+        return int(s)
+    except Exception:
+        return None
+
+# --- 관리자 공통 아이템 빌드 (검색/필터/기간/페이지네이션) ---
+def build_staff_items(request, force_status=None):
+    """
+    force_status: '처리중' or '처리완료' or None
+    """
+    q = (request.GET.get('q') or '').strip()
+    status = (request.GET.get('status') or '').strip()
+    d_from = (request.GET.get('from') or '').strip()
+    d_to = (request.GET.get('to') or '').strip()
+
+    base_q = Q()
+    # 검색: 내용/주소/유형/작성자/번호(#17같은 형태 포함)
+    if q:
+        maybe_id = _parse_int(q.lstrip('#'))
+        text_q = (
+            Q(com_contents__icontains=q) |
+            Q(com_location__icontains=q) |
+            Q(com_type__icontains=q) |
+            Q(username__icontains=q)
+        )
+        if maybe_id is not None:
+            text_q |= Q(com_id=maybe_id)
+        base_q &= text_q
+
+    gte, lte = _parse_date(d_from), _parse_date(d_to)
+    if gte and lte and gte > lte:
+        gte, lte = lte, gte
+    if gte:
+        base_q &= Q(com_reg_date__gte=gte)
+    if lte:
+        base_q &= Q(com_reg_date__lt=lte + timedelta(days=1))  # 종료일 포함
+
+    docs = (Complaints.objects(base_q)
+            .only('com_id','username','com_type','com_location','com_reg_date','com_contents')
+            .order_by('-com_reg_date'))
+
+    items = []
+    for c in docs:
+        last = (ComplaintStatus.objects(com_id=c.com_id)
+                .only('status_name','changed_by','updated_at','status_id')
+                .order_by('-updated_at', '-status_id')
+                .first())
+        latest_status = last.status_name if last else '처리중'
+
+        items.append({'doc': c, 'last': last, 'latest_status': latest_status})
+
+    # 상태 필터(강제/선택)
+    want = force_status or (status if status in ('처리중','처리완료') else None)
+    if want:
+        items = [it for it in items if it['latest_status'] == want]
+
+    # 페이지네이션 (5개씩)
+    paginator = Paginator(items, 5)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    return page_obj, {'q': q, 'status': status, 'from': d_from, 'to': d_to}

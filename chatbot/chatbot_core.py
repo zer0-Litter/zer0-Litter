@@ -6,8 +6,8 @@ from dotenv import load_dotenv
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import LLMChain
 from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
+from config import settings
 
-load_dotenv(os.path.expanduser("~/Users/tasha/Projects/zer0-litter/.env"))
 MONGO_URI = os.getenv("MONGO_URI")
 client = MongoClient(MONGO_URI)
 db = client['complaints_db']
@@ -18,7 +18,7 @@ COLLECTIONS = {
 }
 
 # --- LLM 세팅 ---
-llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0.7, max_tokens=150)
+llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0.7, max_tokens=150, api_key=settings.OPENAI_API_KEY)
 
 # --- 프롬프트 ---
 trash_prompt = ChatPromptTemplate.from_messages([
