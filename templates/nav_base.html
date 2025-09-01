@@ -48,7 +48,7 @@
 
       {# 민원 아이콘 - 스태프면 전체 리스트로, 일반 사용자는 작성 페이지로 #}
       {% if user.is_authenticated and user.is_staff %}
-        <a href="{% url 'complain:all_list' %}" class="nav-item">
+        <a href="{% url 'complain:staff_all_list' %}" class="nav-item">
       {% else %}
         <a href="{% url 'complain:complain_add' %}" class="nav-item">
       {% endif %}
@@ -154,38 +154,45 @@
 
 <!-- ✅ 스크립트 -->
   <script>
-    // 공통 모달 열기 함수 (확인만 or 확인+취소 모두 지원)
-    function showModal(message, onConfirm = null, onCancel = null) {
+    function showModal(message, arg2 = null, arg3 = null) {
       const modal = document.getElementById('common-modal');
       const messageBox = document.getElementById('modal-message');
       const confirmBtn = document.getElementById('modal-confirm-btn');
-      const cancelBtn = document.getElementById('modal-cancel-btn');
-    
-      if (!message || message.trim() === "") {
-        message = "알 수 없는 메시지입니다.";
+      const cancelBtn  = document.getElementById('modal-cancel-btn');
+
+      // 기본값
+      let confirmText = '확인';
+      let cancelText  = '취소';
+      let onConfirm   = null;
+      let onCancel    = null;
+      let showCancel  = false;
+
+      // 하위호환: (message, onConfirm, onCancel)
+      if (typeof arg2 === 'function' || arg2 === null) {
+        onConfirm = arg2;
+        onCancel  = arg3;
+        showCancel = !!onCancel;
+      }
+      // 신규형: (message, {confirmText, cancelText, onConfirm, onCancel, showCancel})
+      else if (typeof arg2 === 'object' && arg2 !== null) {
+        confirmText = arg2.confirmText || confirmText;
+        cancelText  = arg2.cancelText  || cancelText;
+        onConfirm   = arg2.onConfirm   || null;
+        onCancel    = arg2.onCancel    || null;
+        showCancel  = ('showCancel' in arg2) ? !!arg2.showCancel : !!onCancel;
       }
 
-      messageBox.innerHTML = message;
+      messageBox.innerHTML = message || "알 수 없는 메시지입니다.";
       messageBox.dataset.active = "true";
       modal.style.display = 'flex';
 
-      // 버튼 핸들러 설정
-      confirmBtn.onclick = () => {
-        hideModal();
-        if (onConfirm) onConfirm();
-      };
+      confirmBtn.textContent = confirmText;
+      cancelBtn.textContent  = cancelText;
 
-      cancelBtn.onclick = () => {
-        hideModal();
-        if (onCancel) onCancel();
-      };
+      confirmBtn.onclick = () => { hideModal(); if (onConfirm) onConfirm(); };
+      cancelBtn.onclick  = () => { hideModal(); if (onCancel)  onCancel();  };
 
-      // 취소 버튼 표시 여부 결정
-      if (onCancel === null) {
-        cancelBtn.style.display = 'none';
-      } else {
-        cancelBtn.style.display = 'inline-block';
-      }
+      cancelBtn.style.display = showCancel ? 'inline-block' : 'none';
     }
 
     function hideModal() {
@@ -212,7 +219,7 @@
         if (loginMenu) loginMenu.style.display = 'block';
         if (logoutMenu) logoutMenu.style.display = 'none';
 
-        if (path.includes("/mypage") || path.includes("/complaint_all_list")) {
+        if (path.includes("/mypage") || path.includes("/complaint_all")) {
           showModal("로그인이 필요합니다!", () => {
             window.location.href = "{% url 'accounts:login' %}";
           });
@@ -253,27 +260,165 @@
 
     // 민원 상세 모달
     function showComplaintDetailModal(el) {
-      const type = el.dataset.type;
-      const date = el.dataset.date;
+      const comId    = el.dataset.comId;
+      const type     = el.dataset.type;
+      const date     = el.dataset.date;
       const location = el.dataset.location;
-      const title = el.dataset.title;
       const contents = el.dataset.content;
-      const re = el.dataset.re;
-      const trashcan = el.dataset.trashcan;
-      const status = el.dataset.status;
-      const trashType = el.dataset.trash_type;
 
       const message = `
-        <div style="text-align: left;">
-          <strong>제목:</strong> ${title}<br>
+        <div style="text-align:left; line-height:1.6;">
           <strong>민원 종류:</strong> ${type}<br>
           <strong>날짜:</strong> ${date}<br>
           <strong>주소:</strong> ${location}<br>
-          <strong>내용:</strong><br>${contents}<br>
+          <strong>내용:</strong><br>${contents}
         </div>
       `;
-      showModal(message);
+
+      // 확인 / 수정 두 버튼
+      showModal(message, {
+        confirmText: '확인',
+        cancelText: '수정',
+        showCancel: true,
+        onCancel: () => openComplaintEditModal({ comId, type, location, contents }, el)
+      });
     }
+
+    // 수정 폼 모달
+    function openComplaintEditModal(data, listItemEl) {
+      const selectedTypes = parseTypeDisplay(data.type);  // "청소요청, 수리요청" → ["청소요청","수리요청"]
+
+      const message = `
+        <form id="complaint-edit-form" style="text-align:left;">
+          <label><strong>민원 종류</strong> <small>(여러 개 선택 가능)</small></label><br>
+          ${renderTypeChips(selectedTypes)}
+          <br>
+
+          <label><strong>주소</strong><br> <small>(변경 불가 · 변경하려면 재민원을 이용해주세요)</small></label><br>
+          <input type="text" value="${escapeHtml(data.location)}"
+                 style="width:100%; background:#f7f7f7; color:#666;"
+                 readonly><br><br>
+
+          <label><strong>내용</strong></label><br>
+          <textarea name="content" rows="5" style="width:100%;">${escapeHtml(data.contents)}</textarea>
+        </form>
+      `;
+
+      showModal(message, {
+        confirmText: '저장',
+        cancelText: '취소',
+        showCancel: true,
+        onConfirm: () => submitComplaintEdit(data.comId, listItemEl),
+        onCancel: null
+      });
+
+      // 칩 클릭 토글 활성화
+      bindTypeChipHandlers();
+    }
+
+    // XSS 방지용 간단 이스케이프
+    function escapeHtml(s) {
+      return (s || '').replace(/[&<>"']/g, m =>
+        ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])
+      );
+    }
+
+    // 저장 요청
+    function submitComplaintEdit(comId, listItemEl) {
+      const f = document.getElementById('complaint-edit-form');
+      const selected = Array.from(document.querySelectorAll('.type-chip.selected'))
+                        .map(b => b.dataset.value);
+      const payload = {
+        com_id: comId,
+        type_list: selected,              // ← 배열로 전달
+        content:    f.content.value
+      };
+
+      fetch("{% url 'accounts:complain_update_api' %}", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload)
+      })
+      .then(async (r) => {
+        const ct  = r.headers.get('content-type') || '';
+        const raw = await r.text();
+        let body = null;
+        if (ct.includes('application/json')) { try { body = JSON.parse(raw); } catch(e){} }
+        return { ok: r.ok, status: r.status, body, raw };
+      })
+      .then(({ ok, status, body, raw }) => {
+        if (!ok || !body || body.ok === false) {
+          const msg = (body && body.msg) ? body.msg : `HTTP ${status} - ${raw.slice(0,120)}`;
+          throw new Error(msg);
+        }
+
+
+        // 화면 즉시 갱신
+        const typeDisplay = selected.join(", ");
+        listItemEl.dataset.type     = typeDisplay;
+        listItemEl.dataset.content  = payload.content;
+
+        const infoTitle = listItemEl.querySelector('.complaint-title');
+        if (infoTitle) infoTitle.textContent = typeDisplay;
+
+        showModal('수정이 저장되었습니다.');
+      })
+      .catch(e => showModal(`저장 중 오류: ${e.message || e}`));
+    }
+
+    // 선택 가능한 유형(원하면 여기 목록만 편집하면 됨)
+    const COMPLAINT_TYPES = ["청소요청", "수리요청", "추가요청", "기타"];
+
+    // 문자열("청소요청, 수리요청") → 배열
+    function parseTypeDisplay(str){
+      return (str || "")
+        .split(",")
+        .map(s => s.trim())
+        .filter(Boolean);
+    }
+
+    // 칩 HTML 생성
+    function renderTypeChips(selectedList){
+      const selected = new Set(selectedList || []);
+      return `
+        <div id="type-chip-wrap" style="display:flex;gap:.5rem;flex-wrap:wrap;">
+          ${COMPLAINT_TYPES.map(t => `
+            <button type="button"
+                    class="type-chip ${selected.has(t) ? 'selected' : ''}"
+                    data-value="${t}"
+                    style="padding:.4rem .8rem;border:1px solid #ddd;border-radius:999px;cursor:pointer;background:#fff;">
+              ${t}
+            </button>
+          `).join("")}
+        </div>
+        <input type="hidden" name="type_list" id="type_list_hidden" />
+      `;
+    }
+
+    // 칩 클릭 토글 핸들러(모달 열릴 때 1번만 붙임)
+    function bindTypeChipHandlers(){
+      const wrap = document.getElementById("type-chip-wrap");
+      if(!wrap) return;
+
+      // 초기 상태 동기화
+      wrap.querySelectorAll(".type-chip").forEach(syncChipVisual);
+
+      wrap.onclick = (e)=>{
+        const btn = e.target.closest(".type-chip");
+        if(!btn) return;
+        btn.classList.toggle("selected");
+        syncChipVisual(btn);
+      };
+    }
+
+    function syncChipVisual(btn){
+      const sel = btn.classList.contains("selected");
+      btn.style.background  = sel ? "#e8f5e9" : "#fff";
+      btn.style.borderColor = sel ? "#4caf50" : "#ddd";
+      btn.style.color       = sel ? "#2e7d32" : "inherit";
+    }
+
   </script>
 
  {% block extra_script %}{% endblock %}

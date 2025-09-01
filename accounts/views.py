@@ -2,7 +2,7 @@ from functools import wraps
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 from rest_framework.parsers import MultiPartParser,FormParser
 from common.models import Users
 from rest_framework.views import APIView
@@ -17,11 +17,15 @@ from django.http import JsonResponse
 from django.contrib.auth import login as auth_login, update_session_auth_hash
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth import logout
-import json
 import re
 from common.models_mongo import Complaints, ComplaintStatus
 from django.contrib.auth import logout as django_logout
 from django.urls import reverse
+from django.core.paginator import Paginator
+from mongoengine.queryset.visitor import Q
+from datetime import datetime, timedelta
+import json
+from mongoengine.errors import ValidationError, DoesNotExist
 
 
 # Create your views here.
@@ -142,11 +146,6 @@ def mypage_update(request):
     confirm  = request.POST.get('password_confirm')
 
     # 새 비밀번호가 입력된 경우에만 현재 비밀번호 확인
-    if new_pw:
-        if not user.check_password(current):
-            messages.error(request, '현재 비밀번호가 일치하지 않습니다.')
-            return redirect('accounts:mypage_edit')
-
     # 비밀번호 변경 요청이 있을 때
     if new_pw:
         if not user.check_password(current):
@@ -252,7 +251,6 @@ def mypage_home(request):
             icon_type = complaint_type.split(',')[0].strip()
 
         complaints_display.append({
-            'title': complaint.com_title,
             'date': complaint.com_reg_date,
             'type': complaint_type,  # 여기도 전체 리스트/문자열 그대로
             'location': complaint.com_location,
@@ -272,16 +270,50 @@ def mypage_home(request):
 @login_required
 def complaint_all_list(request):
     username = request.user.username
-    user_complaints = Complaints.objects(username=username).order_by('-com_reg_date')
+
+    q = (request.GET.get('q') or '').strip()
+    status = (request.GET.get('status') or '').strip()
+    d_from = (request.GET.get('from') or '').strip()
+    d_to = (request.GET.get('to') or '').strip()
+
+    base_q = Q(username=username)
+    if q:
+        base_q &= (
+            Q(com_contents__icontains=q) |
+            Q(com_location__icontains=q) |
+            Q(com_type__icontains=q) |
+            Q(com_type__in=[q])  # 리스트형 보완(선택)
+        )
+
+    def parse_date(s):
+        try:
+            return datetime.strptime(s, "%Y-%m-%d")
+        except ValueError:
+            return None
+
+    gte, lte = parse_date(d_from), parse_date(d_to)
+    if gte and lte and gte > lte:
+        gte, lte = lte, gte
+
+    if gte:
+        base_q &= Q(com_reg_date__gte=gte)
+    if lte:
+        base_q &= Q(com_reg_date__lt=lte + timedelta(days=1))  # 종료일 포함
+
+    user_complaints = (
+        Complaints.objects(base_q)
+        .only('com_id','com_reg_date','com_type','com_location','com_contents')
+        .order_by('-com_reg_date')
+    )
 
     all_complaints = []
     for complaint in user_complaints:
-        # 상태명
-        last = ComplaintStatus.objects(com_id=complaint.com_id) \
-            .order_by('-updated_at', '-status_id').first()
+        last = (ComplaintStatus.objects(com_id=complaint.com_id)
+                .only('status_name','updated_at','status_id')
+                .order_by('-updated_at','-status_id')
+                .first())
         status_name = last.status_name if last else '처리중'
 
-        # 타입 표준화: 리스트 보장 + 표시문자열 + 아이콘용 첫 항목
         raw_type = complaint.com_type
         if isinstance(raw_type, list):
             type_list = [t.strip() for t in raw_type if t and str(t).strip()]
@@ -293,19 +325,79 @@ def complaint_all_list(request):
 
         all_complaints.append({
             'com_id': complaint.com_id,
-            'title': complaint.com_title,
             'date': complaint.com_reg_date,
-            'type_list': type_list,        # 필요하면 데이터 속성에 쓰기
-            'type_display': type_display,  # 화면 출력용 (문자 하나씩 아님)
-            'icon_type': icon_type,        # 아이콘 파일명에 사용
+            'type_list': type_list,
+            'type_display': type_display,
+            'icon_type': icon_type,
             'location': complaint.com_location,
             'status': status_name,
-            'content' : complaint.com_contents,
+            'content': complaint.com_contents,
         })
 
+    if status in ('처리중','처리완료'):
+        all_complaints = [c for c in all_complaints if c['status'] == status]
+
+    paginator = Paginator(all_complaints, 5)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
     return render(request, 'accounts/complaint_all_list.html', {
-        'complaints': all_complaints
+        'page_obj': page_obj,
+        'query': {'q': q, 'status': status, 'from': d_from, 'to': d_to}
     })
+
+@csrf_exempt
+@login_required
+@require_POST
+def complaint_update_api(request):
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"ok": False, "msg": "잘못된 요청 본문"}, status=400)
+
+    com_id     = data.get("com_id")
+    title      = (data.get("title") or "").strip()
+    content    = (data.get("content") or "").strip()
+    location   = (data.get("location") or "").strip()
+
+    # 유형은 리스트 또는 콤마문자열 모두 허용
+    raw_type = data.get("type_list") or data.get("type_display")
+    if isinstance(raw_type, str):
+        type_list = [t.strip() for t in raw_type.split(",") if t.strip()]
+    else:
+        type_list = [t.strip() for t in (raw_type or []) if t and str(t).strip()]
+
+    if not com_id:
+        return JsonResponse({"ok": False, "msg": "com_id가 없습니다."}, status=400)
+
+    # 본인 소유 문서만
+    try:
+        doc = Complaints.objects.get(com_id=int(com_id), username=request.user.username)
+    except (DoesNotExist, ValidationError, ValueError):
+        return JsonResponse({"ok": False, "msg": "민원을 찾을 수 없습니다."}, status=404)
+
+    # 업데이트 필드 구성(빈 값은 무시)
+    updates = {}
+    if content:
+        updates["com_contents"] = content
+    if raw_type is not None:
+        if isinstance(doc.com_type, list):
+            updates["com_type"] = type_list  # 문서가 리스트면 리스트
+        else:
+            updates["com_type"] = ", ".join(type_list)  # 문서가 문자열이면 문자열
+    if location:
+        updates["com_location"] = location
+
+    if not updates:
+        return JsonResponse({"ok": False, "msg": "변경할 값이 없습니다."}, status=400)
+
+    try:
+        for k, v in updates.items():
+            setattr(doc, k, v)
+        doc.save()
+    except ValidationError as e:  # ← 500 대신 400으로 명확한 에러
+        return JsonResponse({"ok": False, "msg": f"저장 실패: {e}"}, status=400)
+
+    return JsonResponse({"ok": True})
 
 
 

@@ -8,7 +8,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 {% endblock %}
 
-
 {% block content %}
 <div class="container">
   <a href="{% url 'accounts:mypage_home' %}" class="back-link">
@@ -17,21 +16,67 @@
       <span class="title-text">민원 전체 목록</span>
     </div>
   </a>
-  <p class="section-subtitle">최근 요청된 민원</p>
+
+  <!-- 검색/필터 -->
+  <form class="complaint-filters" method="get">
+    <div class="date-range single">
+      <input
+        type="text"
+        id="daterange_display"
+        class="daterange-display"
+        placeholder="기간 선택 (연도-월-일 ~ 연도-월-일)"
+        readonly
+      >
+
+      <!-- 숨김: 실제로 전송되는 값 -->
+      <input type="date" name="from" id="date_from" value="{{ query.from|default:'' }}" hidden>
+      <input type="date" name="to"   id="date_to"   value="{{ query.to|default:'' }}"   hidden>
+
+      <!-- 팝오버: 클릭 시 열림 -->
+      <div id="daterange_popover" class="daterange-popover" hidden>
+        <div class="row">
+          <input type="date" id="dr_from">
+          <span class="tilde">~</span>
+          <input type="date" id="dr_to">
+        </div>
+        <div class="row actions">
+          <button type="button" id="dr_clear" class="btn-ghost">지우기</button>
+          <button type="button" id="dr_apply" class="btn-primary">적용</button>
+        </div>
+      </div>
+    </div>
+
+    <input class="q-field" type="text" name="q"
+           placeholder="검색 (제목/내용/주소/유형)"
+           value="{{ query.q|default:'' }}">
+
+    <select class="status-field" name="status">
+      <option value="" {% if not query.status %}selected{% endif %}>상태 전체</option>
+      <option value="처리중" {% if query.status == '처리중' %}selected{% endif %}>처리중</option>
+      <option value="처리완료" {% if query.status == '처리완료' %}selected{% endif %}>처리완료</option>
+    </select>
+
+    <div class="actions">
+      <a class="filter-reset" href="?">초기화</a>
+      <button type="submit" class="filter-submit">검색</button>
+    </div>
+  </form>
+
 
   <ul class="complaint-list">
-    {% for c in complaints %}
+    {% for c in page_obj %}
       {% with icon_path='img/icon_'|add:c.icon_type|add:'.png' %}
       <li class="complaint-item"
           onclick="showComplaintDetailModal(this)"
-          data-type="{{ c.type_display }}"
+          data-com-id="{{ c.com_id }}"
+          data-type="{{ c.type_display|escape }}"
           data-date="{{ c.date|date:'Y-m-d' }}"
-          data-location="{{ c.location }}"
-          data-title="{{ c.title }}"
-          data-content="{{ c.content }}">
+          data-location="{{ c.location|escape }}"
+          data-content="{{ c.content|escape }}">
         <div class="complaint-left">
           <img src="{% static icon_path %}" class="icon" alt="아이콘">
           <div class="complaint-info">
+            <!-- JS가 즉시 갱신할 때 이 두 클래스만 찾아 바꿉니다 -->
             <p class="complaint-title">{{ c.type_display }}</p>
             <p class="complaint-date">{{ c.date|date:"Y-m-d" }}, {{ c.location }}</p>
           </div>
@@ -41,15 +86,109 @@
         </div>
       </li>
       {% endwith %}
+    {% empty %}
+      <li class="complaint-empty">표시할 민원이 없습니다.</li>
     {% endfor %}
   </ul>
 
+  <!-- 페이지네이션: 필터 파라미터 유지 -->
+  <nav class="pagination" aria-label="페이지네이션">
+    {% if page_obj.has_previous %}
+      <a class="page-link prev"
+         href="?page={{ page_obj.previous_page_number }}&q={{ query.q }}&type={{ query.type }}&status={{ query.status }}&from={{ query.from }}&to={{ query.to }}">이전</a>
+    {% else %}
+      <span class="page-link prev disabled">이전</span>
+    {% endif %}
 
+    {% for num in page_obj.paginator.page_range %}
+      {% if page_obj.number == num %}
+        <strong class="page-link current">{{ num }}</strong>
+      {% else %}
+        <a class="page-link"
+           href="?page={{ num }}&q={{ query.q }}&type={{ query.type }}&status={{ query.status }}&from={{ query.from }}&to={{ query.to }}">{{ num }}</a>
+      {% endif %}
+    {% endfor %}
+
+    {% if page_obj.has_next %}
+      <a class="page-link next"
+         href="?page={{ page_obj.next_page_number }}&q={{ query.q }}&type={{ query.type }}&status={{ query.status }}&from={{ query.from }}&to={{ query.to }}">다음</a>
+    {% else %}
+      <span class="page-link next disabled">다음</span>
+    {% endif %}
+  </nav>
 
   <div class="add-btn-wrapper">
     <a href="{% url 'complain:complain_add' %}" class="add-btn">민원 추가하기</a>
   </div>
 </div>
+
+<script>
+(function(){
+  const display = document.getElementById('daterange_display');
+  const pop     = document.getElementById('daterange_popover');
+  const hFrom   = document.getElementById('date_from');
+  const hTo     = document.getElementById('date_to');
+  const drFrom  = document.getElementById('dr_from');
+  const drTo    = document.getElementById('dr_to');
+  const btnApply= document.getElementById('dr_apply');
+  const btnClear= document.getElementById('dr_clear');
+
+  function fmt(a,b){
+    if (a && b) return `${a} ~ ${b}`;
+    if (a)      return `${a} ~ `;
+    if (b)      return ` ~ ${b}`;
+    return '';
+  }
+
+  function openPopover(){
+    // 현재 숨은 값으로 팝오버 입력값 동기화
+    drFrom.value = hFrom.value || '';
+    drTo.value   = hTo.value   || '';
+    pop.hidden   = false;
+  }
+
+  function closePopover(){ pop.hidden = true; }
+
+  function apply(){
+    let a = drFrom.value, b = drTo.value;
+    // 둘 다 있으면 순서 보정
+    if (a && b && a > b) { const t = a; a = b; b = t; }
+    hFrom.value = a || '';
+    hTo.value   = b || '';
+    display.value = fmt(hFrom.value, hTo.value);
+    closePopover();
+  }
+
+  function clearAll(){
+    drFrom.value = '';
+    drTo.value   = '';
+    hFrom.value  = '';
+    hTo.value    = '';
+    display.value= '';
+    closePopover();
+  }
+
+  // 초기 표시값
+  display.value = fmt(hFrom.value, hTo.value);
+
+  // 열기/닫기
+  display.addEventListener('click', (e)=>{ e.stopPropagation(); openPopover(); });
+  document.addEventListener('click', (e)=>{
+    // 팝오버 외부 클릭 시 닫기
+    if (!pop.hidden && !pop.contains(e.target) && e.target !== display) closePopover();
+  });
+
+  // 버튼 동작
+  btnApply.addEventListener('click', apply);
+  btnClear.addEventListener('click', clearAll);
+
+  // Enter 키로 적용
+  drFrom.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); apply(); }});
+  drTo  .addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); apply(); }});
+})();
+</script>
+
 {% endblock %}
+
 
 

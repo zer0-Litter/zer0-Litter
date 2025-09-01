@@ -6,16 +6,39 @@
 {% endblock %}
 
 {% block content %}
-<h2>전체 민원</h2>
+{% block title %}처리완료 민원{% endblock %}
 
 <div class="list-switch">
-  <a href="{% url 'complain:all_list' %}"       class="tab {% if request.resolver_match.url_name == 'all_list' %}active{% endif %}">전체</a>
+  <a href="{% url 'complain:staff_all_list' %}"       class="tab {% if request.resolver_match.url_name == 'staff_all_list' %}active{% endif %}">전체</a>
   <a href="{% url 'complain:pending_list' %}"   class="tab {% if request.resolver_match.url_name == 'pending_list' %}active{% endif %}">처리중</a>
   <a href="{% url 'complain:completed_list' %}" class="tab {% if request.resolver_match.url_name == 'completed_list' %}active{% endif %}">처리완료</a>
 </div>
 
+<!-- 필터 바 -->
+<form method="get" class="filter-bar">
+  <div class="row">
+    <label>상태</label>
+    <select name="status">
+      <option value="">전체</option>
+      <option value="처리중" {% if query.status == '처리중' %}selected{% endif %}>처리중</option>
+      <option value="처리완료" {% if query.status == '처리완료' %}selected{% endif %}>처리완료</option>
+    </select>
+
+    <label>기간</label>
+    <input type="date" name="from" value="{{ query.from }}">
+    <span>~</span>
+    <input type="date" name="to" value="{{ query.to }}">
+  </div>
+
+  <div class="row">
+    <input type="text" name="q" placeholder="제목/내용/주소/유형/작성자/#번호" value="{{ query.q }}" style="flex:1;">
+    <a class="btn-reset" href="{% url 'complain:staff_all_list' %}">초기화</a>
+    <button class="btn-search" type="submit">검색</button>
+  </div>
+</form>
+
 <ul class="complaint-list">
-  {% for it in items %}
+  {% for it in page_obj %}
     {% with c=it.doc last=it.last %}
     <li class="complaint-item">
       <div class="complaint-title">
@@ -38,6 +61,32 @@
       {% endif %}
     </li>
     {% endwith %}
+  {% empty %}
+    <li class="complaint-item">검색 조건에 맞는 결과가 없습니다.</li>
   {% endfor %}
 </ul>
+
+
+<!-- 페이지네이션 (파라미터 유지) -->
+{% if page_obj.paginator.num_pages > 1 %}
+<div class="pagination">
+  {% with qv=query.q|default:''|urlencode sv=query.status|default:''|urlencode fv=query.from|default:''|urlencode tv=query.to|default:''|urlencode %}
+    {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}&q={{ qv }}&status={{ sv }}&from={{ fv }}&to={{ tv }}">이전</a>
+    {% endif %}
+
+    {% for num in page_obj.paginator.page_range %}
+      {% if num == page_obj.number %}
+        <span class="current">{{ num }}</span>
+      {% else %}
+        <a href="?page={{ num }}&q={{ qv }}&status={{ sv }}&from={{ fv }}&to={{ tv }}">{{ num }}</a>
+      {% endif %}
+    {% endfor %}
+
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}&q={{ qv }}&status={{ sv }}&from={{ fv }}&to={{ tv }}">다음</a>
+    {% endif %}
+  {% endwith %}
+</div>
+{% endif %}
 {% endblock %}

@@ -36,3 +36,126 @@
 @media (max-width:420px){
   .complaint-title .summary{display:block; margin-left:0; margin-top:4px;}
 }
+
+/* ==== 필터 바 전체 ==== */
+.filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0px;
+  border: none;
+  background: none;
+  box-shadow: none;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.filter-bar .row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+/* ==== 입력 필드 ==== */
+.filter-bar input[type="text"],
+.filter-bar select,
+.filter-bar input[type="date"] {
+  height: 36px;
+  padding: 0 8px;
+  border: none;
+  border-bottom: 1.2px solid #d0d6e2;
+  background: none;
+  font-size: 15px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.filter-bar input[type="text"]:focus,
+.filter-bar select:focus,
+.filter-bar input[type="date"]:focus {
+  border-color: #3873fa;
+  box-shadow: 0 0 0 2px rgba(56,115,250,.1);
+}
+
+/* ==== 버튼 ==== */
+.btn-reset, .btn-search {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 0 18px;
+  margin-left: 4px;
+  min-width: 0;
+  border: none;
+  background: #eaeef2;
+  color: #222;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+
+
+.btn-reset {
+  background: #f2f4f7;
+  color: #555;
+}
+
+.btn-search {
+  background: #4caf4f;
+  color: #fff;
+  border: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.btn-search:hover, .btn-search:focus {
+  background: #388e3c;   /* 좀더 짙은 그린 (hover) */
+  color: #fff;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 28px 0 8px;
+}
+
+.pagination a,
+.pagination span.current {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 15px;
+  color: #222;
+  background: #fff;
+  border: 1.5px solid #e6e9f0;
+  transition: box-shadow 0.13s, background .13s, color .13s;
+  text-decoration: none;
+}
+
+.pagination a:hover {
+  background: #e8f5e9;   /* 연그린 (hover 효과) */
+  color: #388e3c;        /* 짙은 그린 */
+  border-color: #a5d6a7;
+}
+.pagination span.current {
+  background: #3873fa;
+  color: #fff;
+  border-color: #3873fa;
+}
+
+/* 좁은 화면에서도 버튼은 가로 유지 */
+@media (max-width: 640px) {
+  .filter-bar input, .btn-reset, .btn-search { font-size: 13px; height: 30px; padding: 0 10px; }
+}

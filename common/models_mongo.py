@@ -33,7 +33,6 @@ class Complaints(Document):
     com_location = StringField(max_length=255)
     lat = FloatField(null=True)
     lon = FloatField(null=True)
-    com_title = StringField(max_length=255, required=True)
     com_contents = StringField(max_length=255)
     com_reg_date = DateTimeField()
 
