@@ -1,287 +1,3 @@
-/* ===================== 상단 탭 ===================== */
-.list-switch {
-  display: flex;
-  gap: 10px;
-  margin: 8px 0 14px;
-}
-.list-switch .tab {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 40px;
-  padding: 0 16px;
-  border: 1px solid #d0d0d0;
-  border-radius: 999px;
-  font-weight: 600;
-  text-decoration: none;
-  color: #111;
-  background: #fff;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, .02);
-  cursor: pointer;
-}
-.list-switch .tab:hover { box-shadow: 0 1px 8px rgba(0, 0, 0, .08); }
-.list-switch .tab.active {
-  background: #111;
-  color: #fff;
-  border-color: #111;
-}
-
-/* ===================== 카드 리스트 ===================== */
-.complaint-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
-.complaint-item {
-  border: 1px solid #e6e6e6;
-  border-radius: 12px;
-  padding: 12px 14px;
-  background: #fff;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, .02);
-}
-.complaint-title b { font-weight: 800; }
-.complaint-title .author { margin-left: 8px; color: #666; font-weight: 600; }
-.complaint-title .summary { margin-left: 6px; }
-.complaint-meta { margin-top: 6px; color: #555; font-size: 13px; }
-.badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-  border: 1px solid #e0e0e0;
-  background: #f4f4f4;
-  color: #555;
-  margin-right: 6px;
-}
-
-/* ===================== 액션 버튼 ===================== */
-.btn-action {
-  margin-top: 8px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: 1px solid #111;
-  background: #111;
-  color: #fff;
-  cursor: pointer;
-}
-.btn-action:hover { filter: brightness(1.05); }
-
-/* ===================== 필터 바 ===================== */
-.filter-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-  background: none;
-  border: none;
-  box-shadow: none;
-}
-.filter-bar .row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  width: 100%;
-}
-.filter-bar input[type="text"],
-.filter-bar select,
-.filter-bar input[type="date"] {
-  height: 36px;
-  padding: 0 8px;
-  border: none;
-  border-bottom: 1.2px solid #d0d6e2;
-  background: none;
-  font-size: 15px;
-  box-sizing: border-box;
-}
-.filter-bar input[type="text"]:focus,
-.filter-bar select:focus,
-.filter-bar input[type="date"]:focus {
-  border-color: #3873fa;
-  box-shadow: 0 0 0 2px rgba(56,115,250,.1);
-}
-
-/* 버튼 */
-.btn-reset, .btn-search {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 36px;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 15px;
-  padding: 0 18px;
-  margin-left: 4px;
-  border: none;
-  white-space: nowrap;
-  box-sizing: border-box;
-}
-.btn-reset { background: #f2f4f7; color: #555; }
-.btn-search {
-  background: #4caf4f;
-  color: #fff;
-  transition: background 0.15s;
-}
-.btn-search:hover, .btn-search:focus { background: #388e3c; }
-
-/* ===================== complaint-filters (그리드) ===================== */
-.complaint-filters {
-  display: grid;
-  gap: 8px;
-  align-items: center;
-  margin: 8px 0 16px;
-  grid-template-columns: minmax(0, 1fr) max-content;
-  grid-template-areas:
-    "date status"
-    "q actions";
-}
-.complaint-filters .date-range { grid-area: date; display: flex; gap: 6px; min-width: 0; }
-.complaint-filters .q-field { grid-area: q; width: 100%; min-width: 0; }
-.complaint-filters .status-field {
-  grid-area: status;
-  width: 120px;
-  min-width: 110px;
-  max-width: 140px;
-  justify-self: end;
-}
-.complaint-filters .actions {
-  grid-area: actions;
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  justify-content: flex-end;
-  white-space: nowrap;
-}
-
-/* 필터 인풋 */
-.complaint-filters input[type="text"],
-.complaint-filters select,
-.complaint-filters input[type="date"],
-.daterange-display {
-  height: var(--h);
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: #fff;
-  font-size: 14px;
-  color: #111;
-  box-sizing: border-box;
-}
-.complaint-filters input::placeholder { color: #9aa0a6; }
-
-/* 필터 버튼 */
-.filter-reset, .filter-submit {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: var(--h);
-  padding: 0 12px;
-  border-radius: var(--radius);
-  font-size: 14px;
-  white-space: nowrap;
-}
-.filter-reset {
-  border: 1px solid var(--border);
-  background: #fff;
-  color: #222;
-}
-.filter-reset:hover { background: #fafafa; }
-.filter-submit {
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: #fff;
-}
-.filter-submit:hover, .filter-submit:focus-visible {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
-}
-
-/* ===================== Date-range popover ===================== */
-.date-range.single { position: relative; }
-.daterange-popover {
-  position: absolute;
-  z-index: 30;
-  top: calc(100% + 6px);
-  left: 0;
-  min-width: 270px;
-  padding: 10px;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgba(0,0,0,.08);
-}
-.daterange-popover .row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.daterange-popover .row.actions { justify-content: flex-end; margin: 0; }
-.daterange-popover input[type="date"] {
-  height: var(--h);
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-size: 14px;
-}
-.btn-ghost, .btn-primary {
-  height: var(--h);
-  padding: 0 12px;
-  border-radius: var(--radius);
-}
-.btn-ghost { border: 1px solid var(--border); background: #fff; }
-.btn-primary {
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: #fff;
-}
-.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
-
-/* ===================== Pagination ===================== */
-.pagination{ display:flex; justify-content:center; align-items:center; gap:6px; margin:18px 0 10px; flex-wrap:nowrap; white-space:nowrap; }
-.page-link.prev,
-.page-link.next{
-  background: transparent;
-  border: 0;
-  min-width: auto;
-  height: auto;
-  padding: 0;
-  color: #6b7280;           /* 중간 회색 */
-  font-weight: 500;
-}
-
-.page-link.prev:hover,
-.page-link.next:hover{
-  color: var(--accent, #4caf4f); /* 네브바 그린과 톤 맞춤 */
-  background: transparent;
-}
-
-/* 비활성화 상태 */
-.page-link.prev.disabled,
-.page-link.next.disabled{
-  color: #c7c7c7;
-  background: transparent;
-  border: 0;
-}
-
-/* 숫자 버튼과의 간격만 살짝 정리 */
-.pagination{ gap: 10px; }
-/* ===================== 반응형 ===================== */
-@media (max-width: 640px) {
-  .filter-bar input, .btn-reset, .btn-search {
-    font-size: 13px;
-    height: 30px;
-    padding: 0 10px;
-  }
-}
-@media (max-width: 420px) {
-  .complaint-title .summary { display: block; margin: 4px 0 0; }
-  .title-text { font-size: 21px; }
-  .complaint-title { font-size: 15px; }
-  .complaint-date { font-size: 12px; }
-}
-@media (max-width: 360px) {
-  .complaint-filters {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "date"
-      "status"
-      "q"
-      "actions";
-  }
-}
-
-/* ===================== Theme tokens ===================== */
 :root {
   --accent: #4caf4f;
   --accent-hover: #2e7d32;
@@ -290,3 +6,149 @@
   --radius: 12px;
   --h: 40px;
 }
+
+/* ===================== 상단 탭 ===================== */
+.list-switch { display:flex; gap:10px; margin:8px 0 14px; }
+.list-switch .tab{
+  display:inline-flex; align-items:center; justify-content:center;
+  height:40px; padding:0 16px; border:1px solid #d0d0d0; border-radius:999px;
+  font-weight:600; text-decoration:none; color:#111; background:#fff;
+  box-shadow:0 1px 0 rgba(0,0,0,.02); cursor:pointer;
+}
+.list-switch .tab:hover{ box-shadow:0 1px 8px rgba(0,0,0,.08); }
+.list-switch .tab.active{ background:#111; color:#fff; border-color:#111; }
+
+/* ===================== 카드 리스트 ===================== */
+.complaint-list{ list-style:none; padding:0; margin:0; display:grid; gap:12px; }
+.complaint-item{
+  position:relative;               /* 상태 뱃지 절대배치 기준 */
+  border:1px solid #e6e6e6; border-radius:12px;
+  padding:12px 14px;               /* 기본 패딩 */
+  padding-right:110px;             /* ← 오른쪽 뱃지 자리 확보(필요시 조정) */
+  background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.02);
+}
+
+.complaint-title b{ font-weight:800; }
+.complaint-title .author{ margin-left:8px; color:#666; font-weight:600; }
+.complaint-title .summary{ display:block; margin-top:4px; color:#333; }
+
+/* 제목 아래 타입/주소 두 줄 스타일(있을 때) */
+.summary .type, .summary .location{
+  display:block; margin-top:2px; line-height:1.4; color:#333; font-size:14px;
+}
+.summary .type:first-child{ margin-top:0; }
+
+/* 메타(등록/작성자/완료시각) – 왼쪽 묶음만 */
+.complaint-meta{ margin-top:6px; color:#555; font-size:13px; }
+.meta-left{ display:flex; flex-direction:column; gap:2px; }
+.meta-left .meta-row{ line-height:1.35; }
+
+/* ===================== 상태 뱃지 (오른쪽, 카드 '정중앙') ===================== */
+.complaint-status{
+  position:absolute; right:14px; top:50%;
+  transform:translateY(-50%);      /* ← 카드 전체 기준 세로 중앙 */
+  display:flex; align-items:center; justify-content:center;
+  margin:0; height:auto;
+}
+
+/* 뱃지 공통 */
+.badge{
+  display:inline-flex; align-items:center; justify-content:center;
+  height:32px; padding:0 14px; border-radius:999px;
+  font-size:14px; font-weight:600; line-height:1; white-space:nowrap; border:0;
+}
+
+/* 처리중/완료 색상 */
+.badge.status-pending{ background:#FFE08C; color:#111; cursor:pointer; }
+.badge.status-done{ background:#f4f4f4; color:#555; }
+/* hover 효과(처리중만) */
+.badge.status-pending:hover {
+  background: #FF7043;
+  color: #fff;
+}
+
+/* 숨김 폼 */
+.form-mark-complete{ display:none; }
+
+/* ===================== complaint-filters (그리드) ===================== */
+.complaint-filters{
+  display:grid; gap:8px; align-items:center; margin:8px 0 16px;
+  grid-template-columns:minmax(0,1fr) max-content;
+  grid-template-areas:
+    "date status"
+    "q    actions";
+}
+.complaint-filters .date-range{ grid-area:date; display:flex; gap:6px; min-width:0; }
+.complaint-filters .q-field{ grid-area:q; width:100%; min-width:0; }
+.complaint-filters .status-field{
+  grid-area:status; width:120px; min-width:110px; max-width:140px; justify-self:end;
+}
+.complaint-filters .actions{
+  grid-area:actions; display:inline-flex; gap:8px; align-items:center; justify-content:flex-end; white-space:nowrap;
+}
+
+/* 필터 인풋/버튼 */
+.complaint-filters input[type="text"],
+.complaint-filters select,
+.complaint-filters input[type="date"],
+.daterange-display{
+  height:var(--h); padding:0 12px; border:1px solid var(--border);
+  border-radius:var(--radius); background:#fff; font-size:14px; color:#111; box-sizing:border-box;
+}
+.complaint-filters input::placeholder{ color:#9aa0a6; }
+
+.filter-reset, .filter-submit{
+  display:inline-flex; align-items:center; justify-content:center;
+  height:var(--h); padding:0 12px; border-radius:var(--radius); font-size:14px; white-space:nowrap;
+}
+.filter-reset{ border:1px solid var(--border); background:#fff; color:#222; }
+.filter-reset:hover{ background:#fafafa; }
+.filter-submit{ border:1px solid var(--accent); background:var(--accent); color:#fff; }
+.filter-submit:hover, .filter-submit:focus-visible{ background:var(--accent-hover); border-color:var(--accent-hover); }
+
+/* ===================== Date-range popover ===================== */
+.date-range.single{ position:relative; }
+.daterange-popover{
+  position:absolute; z-index:30; top:calc(100% + 6px); left:0; min-width:270px; padding:10px;
+  background:#fff; border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:0 8px 24px rgba(0,0,0,.08);
+}
+.daterange-popover .row{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.daterange-popover .row.actions{ justify-content:flex-end; margin:0; }
+.daterange-popover input[type="date"]{
+  height:var(--h); padding:0 10px; border:1px solid var(--border); border-radius:var(--radius); font-size:14px;
+}
+.btn-ghost, .btn-primary{ height:var(--h); padding:0 12px; border-radius:var(--radius); }
+.btn-ghost{ border:1px solid var(--border); background:#fff; }
+.btn-primary{ border:1px solid var(--accent); background:var(--accent); color:#fff; }
+.btn-primary:hover{ background:var(--accent-hover); border-color:var(--accent-hover); }
+
+/* ===================== Pagination ===================== */
+.pagination{ display:flex; justify-content:center; align-items:center; gap:10px; margin:18px 0 10px; white-space:nowrap; }
+.page-link.prev, .page-link.next{
+  background:transparent; border:0; min-width:auto; height:auto; padding:0;
+  color:#6b7280; font-weight:500;
+}
+.page-link.prev:hover, .page-link.next:hover{ color:var(--accent); background:transparent; }
+.page-link.prev.disabled, .page-link.next.disabled{ color:#c7c7c7; background:transparent; border:0; }
+
+/* ===================== 반응형 ===================== */
+@media (max-width: 640px){
+  .filter-bar input, .btn-reset, .btn-search{ font-size:13px; height:30px; padding:0 10px; }
+}
+@media (max-width: 420px){
+  .complaint-title{ font-size:15px; }
+  .complaint-title .summary{ display:block; margin:4px 0 0; }
+}
+@media (max-width: 360px){
+  .complaint-filters{
+    grid-template-columns:1fr;
+    grid-template-areas:
+      "date"
+      "status"
+      "q"
+      "actions";
+  }
+}
+
+
