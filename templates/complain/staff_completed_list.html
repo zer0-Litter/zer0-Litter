@@ -14,64 +14,73 @@
   <a href="{% url 'complain:completed_list' %}" class="tab {% if request.resolver_match.url_name == 'completed_list' %}active{% endif %}">처리완료</a>
 </div>
 
-<!-- 검색/필터 -->
-  <form class="complaint-filters" method="get">
-    <div class="date-range single">
-      <input
-        type="text"
-        id="daterange_display"
-        class="daterange-display"
-        placeholder="기간 선택 (연도-월-일 ~ 연도-월-일)"
-        readonly
-      >
-
-      <!-- 숨김: 실제로 전송되는 값 -->
-      <input type="date" name="from" id="date_from" value="{{ query.from|default:'' }}" hidden>
-      <input type="date" name="to"   id="date_to"   value="{{ query.to|default:'' }}"   hidden>
-
-      <!-- 팝오버: 클릭 시 열림 -->
-      <div id="daterange_popover" class="daterange-popover" hidden>
-        <div class="row">
-          <input type="date" id="dr_from">
-          <span class="tilde">~</span>
-          <input type="date" id="dr_to">
-        </div>
-        <div class="row actions">
-          <button type="button" id="dr_clear" class="btn-ghost">지우기</button>
-          <button type="button" id="dr_apply" class="btn-primary">적용</button>
-        </div>
+<form class="complaint-filters" method="get">
+  <div class="date-range single">
+    <input type="text" id="daterange_display" class="daterange-display" placeholder="기간 선택 (연도-월-일 ~ 연도-월-일)" readonly>
+    <input type="date" name="from" id="date_from" value="{{ query.from|default:'' }}" hidden>
+    <input type="date" name="to"   id="date_to"   value="{{ query.to|default:'' }}"   hidden>
+    <div id="daterange_popover" class="daterange-popover" hidden>
+      <div class="row">
+        <input type="date" id="dr_from"><span class="tilde">~</span><input type="date" id="dr_to">
+      </div>
+      <div class="row actions">
+        <button type="button" id="dr_clear" class="btn-ghost">지우기</button>
+        <button type="button" id="dr_apply" class="btn-primary">적용</button>
       </div>
     </div>
+  </div>
 
-    <input class="q-field" type="text" name="q"
-           placeholder="검색 (제목/내용/주소/유형)"
-           value="{{ query.q|default:'' }}">
-
-    <select class="status-field" name="status">
-      <option value="" {% if not query.status %}selected{% endif %}>상태 전체</option>
-      <option value="처리중" {% if query.status == '처리중' %}selected{% endif %}>처리중</option>
-      <option value="처리완료" {% if query.status == '처리완료' %}selected{% endif %}>처리완료</option>
-    </select>
-
-    <div class="actions">
-      <a class="filter-reset" href="?">초기화</a>
-      <button type="submit" class="filter-submit">검색</button>
-    </div>
-  </form>
+  <input class="q-field" type="text" name="q" placeholder="검색 (제목/내용/주소/유형)" value="{{ query.q|default:'' }}">
+  <select class="status-field" name="status">
+    <option value="처리완료" {% if query.status == '처리완료' %}selected{% endif %}>처리완료</option>
+  </select>
+  <div class="actions">
+    <a class="filter-reset" href="?">초기화</a>
+    <button type="submit" class="filter-submit">검색</button>
+  </div>
+</form>
 
 <ul class="complaint-list">
   {% for it in page_obj %}
     {% with c=it.doc last=it.last %}
     <li class="complaint-item">
       <div class="complaint-title">
-        <b>#{{ c.com_id }}</b>
-        <span class="author">작성자: {{ c.username }}</span>
-        <span class="summary">| {{ c.com_type }} | {{ c.com_location }}</span>
+        <div>
+          <b>#{{ c.com_id }}</b>
+          <span class="author">작성자: {{ c.username }}</span>
+        </div>
+        <div class="summary">
+          <div class="type">민원: {{ c.com_type }}</div>
+          <div class="location">위치: {{ c.com_location|cut:"서울특별시"|cut:"서울시" }}</div>
+        </div>
       </div>
+
+
       <div class="complaint-meta">
-        <span class="badge">처리완료</span>
-        <span>등록: {{ c.com_reg_date|date:"Y-m-d H:i" }}</span>
-        {% if last %}<span> / 완료자: {{ last.changed_by }} / {{ last.updated_at|date:"Y-m-d H:i" }}</span>{% endif %}
+        <div class="meta-left">
+          <div class="meta-row">등록: {{ c.com_reg_date|date:"Y-m-d H:i" }}</div>
+          {% if last and last.status_name == '처리완료' %}
+            <div class="meta-row">담당자: {{ last.changed_by|default:"-" }}</div>
+            <div class="meta-row">완료: {{ last.updated_at|date:"Y-m-d H:i" }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      {# ← complaint-meta 밖, 카드 오른쪽 열 #}
+      <div class="complaint-status">
+        {% if last and last.status_name == '처리완료' %}
+          <span class="badge status-done">처리완료</span>
+        {% else %}
+          <button type="button"
+                  class="badge status-pending js-mark-complete"
+                  data-form-id="mc-{{ c.com_id }}">처리중</button>
+          <form id="mc-{{ c.com_id }}" class="form-mark-complete"
+                method="post" action="{% url 'complain:mark_completed' c.com_id %}">
+            {% csrf_token %}
+            <input type="hidden" name="next"
+                   value="{{ request.get_full_path }}{% if request.GET %}&{% else %}?{% endif %}updated=1">
+          </form>
+        {% endif %}
       </div>
     </li>
     {% endwith %}
@@ -86,7 +95,6 @@
     {% if page_obj.has_previous %}
       <a href="?page={{ page_obj.previous_page_number }}&q={{ qv }}&status={{ sv }}&from={{ fv }}&to={{ tv }}">이전</a>
     {% endif %}
-
     {% for num in page_obj.paginator.page_range %}
       {% if num == page_obj.number %}
         <span class="current">{{ num }}</span>
@@ -94,7 +102,6 @@
         <a href="?page={{ num }}&q={{ qv }}&status={{ sv }}&from={{ fv }}&to={{ tv }}">{{ num }}</a>
       {% endif %}
     {% endfor %}
-
     {% if page_obj.has_next %}
       <a href="?page={{ page_obj.next_page_number }}&q={{ qv }}&status={{ sv }}&from={{ fv }}&to={{ tv }}">다음</a>
     {% endif %}
@@ -102,72 +109,28 @@
 </div>
 {% endif %}
 
-<!-- 팝오버 동작 스크립트: complaint_all_list와 동일 -->
 <script>
 (function(){
-  const display = document.getElementById('daterange_display');
-  const pop     = document.getElementById('daterange_popover');
-  const hFrom   = document.getElementById('date_from');
-  const hTo     = document.getElementById('date_to');
-  const drFrom  = document.getElementById('dr_from');
-  const drTo    = document.getElementById('dr_to');
-  const btnApply= document.getElementById('dr_apply');
-  const btnClear= document.getElementById('dr_clear');
+  const display=document.getElementById('daterange_display');
+  const pop=document.getElementById('daterange_popover');
+  const hFrom=document.getElementById('date_from'); const hTo=document.getElementById('date_to');
+  const drFrom=document.getElementById('dr_from');  const drTo=document.getElementById('dr_to');
+  const btnApply=document.getElementById('dr_apply'); const btnClear=document.getElementById('dr_clear');
 
-  function fmt(a,b){
-    if (a && b) return `${a} ~ ${b}`;
-    if (a)      return `${a} ~ `;
-    if (b)      return ` ~ ${b}`;
-    return '';
-  }
-
-  function openPopover(){
-    // 현재 숨은 값으로 팝오버 입력값 동기화
-    drFrom.value = hFrom.value || '';
-    drTo.value   = hTo.value   || '';
-    pop.hidden   = false;
-  }
-
-  function closePopover(){ pop.hidden = true; }
-
-  function apply(){
-    let a = drFrom.value, b = drTo.value;
-    // 둘 다 있으면 순서 보정
-    if (a && b && a > b) { const t = a; a = b; b = t; }
-    hFrom.value = a || '';
-    hTo.value   = b || '';
-    display.value = fmt(hFrom.value, hTo.value);
-    closePopover();
-  }
-
-  function clearAll(){
-    drFrom.value = '';
-    drTo.value   = '';
-    hFrom.value  = '';
-    hTo.value    = '';
-    display.value= '';
-    closePopover();
-  }
-
-  // 초기 표시값
-  display.value = fmt(hFrom.value, hTo.value);
-
-  // 열기/닫기
-  display.addEventListener('click', (e)=>{ e.stopPropagation(); openPopover(); });
-  document.addEventListener('click', (e)=>{
-    // 팝오버 외부 클릭 시 닫기
-    if (!pop.hidden && !pop.contains(e.target) && e.target !== display) closePopover();
-  });
-
-  // 버튼 동작
+  function fmt(a,b){ if(a&&b)return `${a} ~ ${b}`; if(a)return `${a} ~ `; if(b)return ` ~ ${b}`; return ''; }
+  function openPopover(){ drFrom.value=hFrom.value||''; drTo.value=hTo.value||''; pop.hidden=false; }
+  function closePopover(){ pop.hidden=true; }
+  function apply(){ let a=drFrom.value,b=drTo.value; if(a&&b&&a>b){const t=a;a=b;b=t;} hFrom.value=a||''; hTo.value=b||''; display.value=fmt(hFrom.value,hTo.value); closePopover(); }
+  function clearAll(){ drFrom.value=''; drTo.value=''; hFrom.value=''; hTo.value=''; display.value=''; closePopover(); }
+  display.value=fmt(hFrom.value,hTo.value);
+  display.addEventListener('click',(e)=>{ e.stopPropagation(); openPopover(); });
+  document.addEventListener('click',(e)=>{ if(!pop.hidden && !pop.contains(e.target) && e.target!==display) closePopover(); });
   btnApply.addEventListener('click', apply);
   btnClear.addEventListener('click', clearAll);
-
-  // Enter 키로 적용
-  drFrom.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); apply(); }});
-  drTo  .addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); apply(); }});
+  drFrom.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); apply(); }});
+  drTo  .addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); apply(); }});
 })();
 </script>
-
 {% endblock %}
+
 
