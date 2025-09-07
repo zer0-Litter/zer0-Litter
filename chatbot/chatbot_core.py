@@ -18,6 +18,7 @@ COLLECTIONS = {
 }
 
 # --- LLM 세팅 ---
+# (성능 위해 전역 llm 하나만 사용. 필요시 max_tokens, timeout 조정 가능)
 llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0.7, max_tokens=150, api_key=settings.OPENAI_API_KEY)
 
 # --- 프롬프트 ---
@@ -26,6 +27,17 @@ trash_prompt = ChatPromptTemplate.from_messages([
     HumanMessagePromptTemplate.from_template("사용자 질문: {user_input}")
 ])
 trash_chain = LLMChain(llm=llm, prompt=trash_prompt)
+
+# --- com_type 분류를 위한 프롬프트(전역 재사용) ---
+_com_type_prompt = ChatPromptTemplate.from_messages([
+    SystemMessagePromptTemplate.from_template(
+        "다음 대화를 참고하여 사용자가 제기한 민원을 "
+        "'청소요청', '수리요청', '추가요청', '기타민원' 중 하나로 분류하세요. "
+        "가능한 경우 유형만 정확히 반환하세요. 모를 경우 가장 가능성 높은 항목 하나를 제안하세요."
+    ),
+    HumanMessagePromptTemplate.from_template("대화 내용:\n{context}\n\n최신 발화: {text}")
+])
+com_type_chain = LLMChain(llm=llm, prompt=_com_type_prompt)
 
 GREETINGS = ["안녕하세요", "안녕", "hi", "hello", "반갑습니다", "안녕하십니까"]
 def is_greeting(text):
@@ -52,7 +64,8 @@ def generate_session_id():
         upsert=True,
         return_document=ReturnDocument.AFTER
     )
-    return f"session-{counter['seq']}"
+    # NOTE: views.py uses "session_5" style, so match that format (underscore)
+    return f"session_{counter['seq']}"
 
 def generate_chat_id():
     counter = db.counters.find_one_and_update(
@@ -89,27 +102,24 @@ def save_complaint(username, complaint_data):
 # -------------------------------
 # 민원 처리
 # -------------------------------
-REQUIRED_FIELDS = ["com_type", "com_contents"]
+REQUIRED_FIELDS = ["com_type", "lat", "lon"]
 complaint_cache = {}
 
 def infer_com_type_with_llm(user_input, chat_history=None):
-    """LLM을 통해 com_type을 추론 (맥락 반영 가능)"""
+    """LLM을 통해 com_type을 추론 (맥락 반영 가능)
+       전역 com_type_chain 사용 -> 매 호출 프롬프트/체인 재생성 방지
+    """
     context = ""
     if chat_history:
+        # chat_history는 dict list 형태 (role, message) 가정
         context = "\n".join([f"{msg['role']}: {msg['message']}" for msg in chat_history[-5:]])
 
-    prompt = ChatPromptTemplate.from_messages([
-        SystemMessagePromptTemplate.from_template(
-            "다음 대화를 참고하여 사용자가 제기한 민원을 "
-            "'청소요청', '수리요청', '추가요청', '기타민원' 중 하나로 분류하세요. "
-            "가능한 경우 유형만 정확히 반환하세요. 모를 경우 가장 가능성 높은 항목 하나를 제안하세요."
-        ),
-        HumanMessagePromptTemplate.from_template(f"대화 내용:\n{context}\n\n최신 발화: {{text}}")
-    ])
-    chain = LLMChain(llm=llm, prompt=prompt)
-    result = chain.invoke({"text": user_input})
-
-    # LLMChain 결과 안전하게 파싱
+    # 체인 재사용: com_type_chain 에서 predict 사용
+    try:
+        result = com_type_chain.predict(context=context, text=user_input)
+    except Exception as e:
+        # LLM 호출 실패 시 빈 문자열 반환 (상위에서 룰로 보완)
+        result = ""
     if isinstance(result, dict):
         raw = result.get("text") or result.get("output") or str(result)
     else:
@@ -118,18 +128,36 @@ def infer_com_type_with_llm(user_input, chat_history=None):
     return truncate_to_full_sentence(raw).strip()
 
 def extract_fields(user_input, chat_history=None):
+    """
+    우선 룰 기반으로 간단히 추출하고, 없으면 infer_com_type_with_llm 호출.
+    -> 이렇게 하면 사용자가 '추가요청' 같은 키워드를 명시했을 때 LLM을 거치지 않아도 됨.
+    """
     data = {}
-    raw_com_type = infer_com_type_with_llm(user_input, chat_history)
-    cleaned = raw_com_type.replace(" ", "")
 
-    # 부분 일치 허용
-    valid_types = ["청소요청", "수리요청", "추가요청", "기타민원"]
-    for t in valid_types:
-        if t in cleaned:
-            data["com_type"] = t
-            break
+    lowered = user_input.replace(" ", "").lower()
+
+    # 룰 기반 매핑 (빠르게 처리하여 반복 응답 방지)
+    if any(k in lowered for k in ["청소", "청소요청", "치우", "청소해"]):
+        data["com_type"] = "청소요청"
+    elif any(k in lowered for k in ["수리", "수리요청", "고장", "수선"]):
+        data["com_type"] = "수리요청"
+    elif any(k in lowered for k in ["추가", "추가요청", "더", "설치"]):
+        data["com_type"] = "추가요청"
+    elif any(k in lowered for k in ["기타", "기타민원"]):
+        data["com_type"] = "기타민원"
     else:
-        data["com_type"] = None
+        # 룰로 못 잡으면 LLM 시도
+        raw_com_type = infer_com_type_with_llm(user_input, chat_history)
+        cleaned = raw_com_type.replace(" ", "")
+
+        # 부분 일치 허용
+        valid_types = ["청소요청", "수리요청", "추가요청", "기타민원"]
+        for t in valid_types:
+            if t in cleaned:
+                data["com_type"] = t
+                break
+        else:
+            data["com_type"] = None
 
     data["com_contents"] = user_input
     return data
@@ -144,22 +172,19 @@ def handle_complain_submit(user_input, username, session_id, chat_history=None):
     extracted = extract_fields(user_input, chat_history)
     cached.update(extracted)
 
-    if all(k in cached and cached[k] for k in ("com_type", "lat", "lon")):
-        # save_complaint() 호출 제거 → views.py에서 자동 생성
+    # lat/lon은 views.py에서만 확인 → 여기서는 com_type만 확인
+    if "com_type" in cached and cached["com_type"]:
         complaint_cache.pop(session_id, None)
-        response = f"신고가 접수될 준비가 되었습니다: {cached}"
+        response = f"민원 유형이 확인되었습니다: {cached['com_type']}"
     else:
         complaint_cache[session_id] = cached
-        missing = [f for f in ("com_type", "lat", "lon") if f not in cached or not cached[f]]
-        if "com_type" in missing:
-            response = (
-                "쓰레기와 관련된 민원으로 보입니다. "
-                "어떤 유형인가요? (청소요청, 수리요청, 추가요청, 기타민원)"
-            )
-        else:
-            response = f"추가 정보가 필요합니다: {', '.join(missing)}"
+        response = (
+            "쓰레기와 관련된 민원으로 보입니다. "
+            "어떤 유형인가요? (청소요청, 수리요청, 추가요청, 기타민원)"
+        )
 
     return response
+
 
 
 
