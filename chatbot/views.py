@@ -3,14 +3,15 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from .chatbot_core import chatbot_router
-from common.models_mongo import ChatHistory, Counter, ChatFiles  # ChatFiles 추가
+from common.models_mongo import ChatHistory, Counter, ChatFiles, Complaints
 from datetime import datetime
 import logging, os
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
-# ---------------- Counter 기반 ID 생성 ----------------
+
+# -------- Counter 기반 ID 생성 --------
 def get_next_chat_id():
     try:
         counter = Counter.objects(name='chat_id').modify(upsert=True, new=True, inc__seq=1)
@@ -21,6 +22,7 @@ def get_next_chat_id():
     except Exception as e:
         logger.error(f"chat_id 생성 실패: {e}")
         return f"chat_{uuid4()}"
+
 
 def get_next_session_id():
     try:
@@ -33,7 +35,8 @@ def get_next_session_id():
         logger.error(f"session_id 생성 실패: {e}")
         return f"session_{uuid4()}"
 
-# ---------------- file_id 생성기 ----------------
+
+# -------- file_id 생성기 --------
 def get_next_file_id():
     try:
         counter = Counter.objects(name='file_id').modify(upsert=True, new=True, inc__seq=1)
@@ -44,6 +47,29 @@ def get_next_file_id():
     except Exception as e:
         logger.error(f"file_id 생성 실패: {e}")
         return f"file_{uuid4()}"
+
+
+# -------- complaint_id 생성 --------
+# 💡 챗봇 전용 카운터를 사용하고, 큰 오프셋을 더해 정수형 ID를 반환합니다.
+def get_next_chatbot_com_id():
+    try:
+        counter = Counter.objects(name='chatbot_com_id').modify(
+            upsert=True, new=True, inc__seq=1
+        )
+        if not counter:
+            counter = Counter(name='chatbot_com_id', seq=1)
+            counter.save()
+            next_seq = 1
+        else:
+            next_seq = counter.seq
+
+        # 💡 1,000,000을 더해 메인 시스템과 ID 충돌을 방지합니다.
+        return 1000000 + next_seq
+    except Exception as e:
+        logger.error(f"chatbot_com_id 생성 실패: {e}")
+        # 실패 시 900000000부터 시작하는 임의의 큰 정수 ID를 반환
+        return 900000000 + int(uuid4().int % 1000000)
+
 
 # ---------------- chatbot_api ----------------
 @csrf_exempt
@@ -57,14 +83,11 @@ def chatbot_api(request):
     user_input = (request.POST.get('message') or '').strip()
     scenario_id = request.POST.get('scenario_id') or 'default'
 
-    # 파일 유무 체크
     has_file = ('file' in request.FILES) or ('files' in request.FILES)
 
-    # ⚠️ 빈 메시지 + 파일 없음이면 아무 것도 안 함(세션 발급 X)
     if not user_input and not has_file:
         return JsonResponse({'response': '', 'session_id': request.POST.get('session_id') or ''})
 
-    # session_id 처리
     session_id = request.POST.get('session_id')
     if not session_id:
         session_id = get_next_session_id()
@@ -74,7 +97,7 @@ def chatbot_api(request):
 
     print(f"username={username}, input={user_input}, scenario_id={scenario_id}, session_id={session_id}")
 
-    # -------- Router 호출 (저장은 라우터가 하지 않도록 위에서 변경) --------
+    # -------- Router 호출 --------
     try:
         result = chatbot_router(user_input, username, session_id, scenario_id)
         print("router 결과:", result)
@@ -92,7 +115,7 @@ def chatbot_api(request):
             chat_id=get_next_chat_id(),
             username=username,
             scenario_id=scenario_id,
-            session_id=session_id,  # result의 session_id와 동일
+            session_id=session_id,
             role='user',
             content=user_input,
             latitude=lat,
@@ -117,8 +140,8 @@ def chatbot_api(request):
         if files:
             for f in files:
                 file_id = get_next_file_id()
-                f.seek(0)  # 파일 포인터를 맨 앞으로
-                binary_data = f.read()  # 전체 읽기
+                f.seek(0)
+                binary_data = f.read()
 
                 ChatFiles(
                     file_id=file_id,
@@ -151,33 +174,34 @@ def chatbot_api(request):
 
     # -------- Complaints 자동 생성 --------
     try:
-        # com_type, lat, lon 모두 있어야 Complaints 생성
-        if chat_doc and chat_doc.latitude and chat_doc.longitude and request.POST.get("com_type"):
-            from common.models_mongo import Complaints  # 지연 로딩
+        com_type_from_router = result.get('com_type')
+
+        if chat_doc and chat_doc.latitude and chat_doc.longitude and com_type_from_router:
+            from common.models_mongo import Complaints
+
+            complaint_id = get_next_chatbot_com_id()
 
             complaint_data = {
-                "com_id": Counter.objects(name="complaint").modify(
-                    upsert=True, new=True, inc__seq=1
-                ).seq,
+                "com_id": complaint_id,
                 "username": username,
-                "com_type": request.POST.get("com_type"),
+                "com_type": com_type_from_router,
                 "lat": chat_doc.latitude,
                 "lon": chat_doc.longitude,
-                "com_title": user_input or "자동 생성 민원",
                 "com_contents": user_input,
                 "com_reg_date": datetime.now()
             }
 
-            # 최근 ChatFiles 2개 첨부
             related_files = ChatFiles.objects(chat_id=chat_doc).order_by("-uploaded_at")[:2]
-            if related_files:
-                if len(related_files) >= 1:
-                    complaint_data["com_pic1"] = related_files[0].file_data
-                if len(related_files) >= 2:
-                    complaint_data["com_pic2"] = related_files[1].file_data
+
+            for i, file in enumerate(related_files):
+                if i == 0:
+                    complaint_data["com_pic1"] = file.file_data
+                elif i == 1:
+                    complaint_data["com_pic2"] = file.file_data
 
             Complaints(**complaint_data).save()
-            print(f"Complaints 저장 완료: com_id={complaint_data['com_id']}")
+            print(f"Complaints 저장 완료: com_id={complaint_id}")
+
     except Exception as e:
         logger.error(f"Complaints 자동 생성 실패: {e}", exc_info=True)
 
@@ -186,10 +210,12 @@ def chatbot_api(request):
         'session_id': session_id
     })
 
+
 # ---------------- 기존 view 유지 ----------------
 @login_required
 def chatbot_chat(request, scenario_id):
     return render(request, 'chatbot/chatbot_chat.html', {'scenario_id': scenario_id})
+
 
 @login_required
 def chatbot_chat_default(request):
