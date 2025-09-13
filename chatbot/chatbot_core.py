@@ -3,16 +3,24 @@ from datetime import datetime, timezone
 import time
 from pymongo import MongoClient, ReturnDocument
 from dotenv import load_dotenv
-from langchain.chat_models import ChatOpenAI
+
+# 💡 최신 LangChain 패키지에서 올바르게 임포트합니다.
+# 이전에 발생했던 오류를 해결하기 위한 핵심 수정 사항입니다.
+from langchain_openai import ChatOpenAI
+from langchain_openai import OpenAIEmbeddings
+
 from langchain.chains import LLMChain
 from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
-from langchain.embeddings import OpenAIEmbeddings
-# 💡 MongoDBAtlasVectorSearch 대신 Chroma import
-from langchain_community.vectorstores import Chroma
+
+# 💡 langchain_community.vectorstores 대신 langchain_chroma 사용
+from langchain_chroma import Chroma
 from config import settings
 import logging
 
 logger = logging.getLogger(__name__)
+
+# .env 파일에서 환경 변수 로드
+load_dotenv()
 
 MONGO_URI = os.getenv("MONGO_URI")
 client = MongoClient(MONGO_URI)
@@ -23,26 +31,34 @@ COLLECTIONS = {
     "complaints": db['complaints'],
 }
 
-# --- LLM 및 임베딩 세팅 ---
+# --- LLM 및 임베딩 설정 ---
+# 💡 LLM(대형 언어 모델)과 임베딩 모델을 설정하는 섹션입니다.
 llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.7, max_tokens=100, api_key=settings.OPENAI_API_KEY)
 embeddings = OpenAIEmbeddings(api_key=settings.OPENAI_API_KEY)
 
-# 💡 views.py에서 생성된 ChromaDB 인스턴스를 로드 (새로운 객체 생성)
-# 'persist_directory'를 지정해 기존에 저장된 임베딩 데이터를 사용하도록 함
+# 💡 ChromaDB 호스트 IP를 환경 변수에서 가져옵니다.
+CHROMA_DB_HOST = os.getenv("CHROMA_DB_HOST")
+
+# 💡 벡터 스토어 인스턴스를 생성하여 ChromaDB에 연결합니다.
 vector_store = Chroma(
     collection_name="complaint_embeddings",
     embedding_function=embeddings,
-    persist_directory="./chroma_db"
+    client_settings={
+        "host": CHROMA_DB_HOST,
+        "port": 8000,
+        "chroma_api_impl": "chromadb.api.fastapi.FastAPI"  # 💡 이 한 줄을 추가해주세요.
+    }
 )
 
-# --- 프롬프트 ---
+# --- 프롬프트 정의 ---
+# 💡 챗봇의 역할을 정의하는 프롬프트들을 설정하는 섹션입니다.
 trash_prompt = ChatPromptTemplate.from_messages([
     SystemMessagePromptTemplate.from_template("당신은 쓰레기통 위치 안내 챗봇입니다."),
     HumanMessagePromptTemplate.from_template("사용자 질문: {user_input}")
 ])
 trash_chain = LLMChain(llm=llm, prompt=trash_prompt)
 
-# 💡 민원 유형을 분류하고, 필요시 질문을 생성하는 통합 프롬프트
+# 💡 민원 유형을 분류하고, 필요시 질문을 생성하는 통합 프롬프트입니다.
 _complaint_chain_prompt = ChatPromptTemplate.from_messages([
     SystemMessagePromptTemplate.from_template(
         "당신은 친절한 민원 접수 챗봇입니다. 사용자의 민원 유형을 '청소요청', '수리요청', '추가요청' 중 하나로 분류하세요. "
@@ -58,14 +74,17 @@ _complaint_chain_prompt = ChatPromptTemplate.from_messages([
 ])
 complaint_chain = LLMChain(llm=llm, prompt=_complaint_chain_prompt)
 
+# --- 유틸리티 함수 ---
+# 💡 챗봇의 동작을 돕는 보조 함수들입니다.
 GREETINGS = ["안녕하세요", "안녕", "hi", "hello", "반갑습니다", "안녕하십니까"]
 
-
 def is_greeting(text):
+    """사용자 입력이 인사말인지 확인합니다."""
     return any(greet in text.lower() for greet in GREETINGS)
 
 
 def classify_scenario(user_input):
+    """사용자 입력에 따라 '민원 접수' 또는 '쓰레기통 찾기' 시나리오로 분류합니다."""
     if any(word in user_input for word in ["쓰레기", "청소", "신고", "넘침", "민원"]):
         return "complain_submit"
     if any(word in user_input for word in ["쓰레기통", "어디", "위치", "찾아줘"]):
@@ -74,14 +93,15 @@ def classify_scenario(user_input):
 
 
 def truncate_to_full_sentence(text):
+    """문장을 완전한 문장 단위로 자릅니다."""
     sentences = re.findall(r'.+?[.!?](?:\s|$)', text)
     return ''.join(sentences).strip()
 
 
-# -------------------------------
-# Counter 기반 ID 생성
-# -------------------------------
+# --- MongoDB ID 생성 함수 ---
+# 💡 MongoDB의 카운터를 사용하여 고유한 ID를 생성합니다.
 def generate_session_id():
+    """새로운 세션 ID를 생성합니다."""
     counter = db.counters.find_one_and_update(
         {'_id': 'session_id'},
         {'$inc': {'seq': 1}},
@@ -92,6 +112,7 @@ def generate_session_id():
 
 
 def generate_chat_id():
+    """새로운 채팅 ID를 생성합니다."""
     counter = db.counters.find_one_and_update(
         {'_id': 'chat_id'},
         {'$inc': {'seq': 1}},
@@ -101,10 +122,10 @@ def generate_chat_id():
     return counter['seq']
 
 
-# -------------------------------
-# DB 저장 함수
-# -------------------------------
+# --- 데이터베이스 저장 함수 ---
+# 💡 챗봇 대화 기록 및 민원 데이터를 MongoDB에 저장하는 함수들입니다.
 def save_chat_history(username, scenario_id, session_id, role, content, is_final=False, metadata=None):
+    """챗봇 대화 기록을 MongoDB에 저장합니다."""
     record = {
         "chat_id": generate_chat_id(),
         "username": username,
@@ -120,19 +141,19 @@ def save_chat_history(username, scenario_id, session_id, role, content, is_final
 
 
 def save_complaint(username, complaint_data):
+    """민원 데이터를 MongoDB에 저장합니다."""
     complaint_data["username"] = username
     complaint_data["com_reg_date"] = datetime.now(timezone.utc)
     return COLLECTIONS["complaints"].insert_one(complaint_data).inserted_id
 
 
-# -------------------------------
-# 민원 처리
-# -------------------------------
+# --- 민원 처리 로직 ---
+# 💡 챗봇의 핵심 로직을 담당하는 함수들입니다.
 REQUIRED_FIELDS = ["com_type", "lat", "lon"]
 
 
-# 💡 새로운 함수: 과거 민원 기록 검색 (ChromaDB용으로 수정)
 def retrieve_complaint_history(query, username, num_results=3):
+    """ChromaDB에서 과거 유사 민원 기록을 검색합니다."""
     retrieved_docs_with_scores = vector_store.similarity_search_with_score(
         query=query,
         k=num_results
@@ -147,19 +168,20 @@ def retrieve_complaint_history(query, username, num_results=3):
 
 
 def handle_complain_submit(user_input, username, session_id, chat_history=None):
-    # 💡 1단계: 첫 발화인 경우, 무조건 질문을 던져 사용자의 의도를 확인
+    """민원 접수 시나리오의 대화를 처리합니다."""
+    # 💡 1단계: 첫 발화인 경우, 무조건 질문을 던져 사용자의 의도를 확인합니다.
     if not chat_history:
         response = "어떤 종류의 민원인가요? 청소가 필요한지, 아니면 수리나 추가 요청인지 말씀해주세요."
         return {"response": response, "com_type": None}
 
-    # 💡 2단계: 두 번째 턴부터는 LLM을 통해 민원 유형 파악
+    # 💡 2단계: 두 번째 턴부터는 LLM을 통해 민원 유형을 파악합니다.
     chat_history_text = "\n".join([f"{chat['role']}: {chat['content']}" for chat in chat_history])
 
-    # 💡 과거 민원 기록 검색
+    # 💡 과거 민원 기록을 검색합니다.
     retrieved_context = retrieve_complaint_history(user_input, username)
 
     try:
-        # LLM 호출 시 과거 기록을 함께 전달
+        # LLM 호출 시 과거 기록을 함께 전달합니다.
         llm_output = complaint_chain.predict(
             chat_history=chat_history_text,
             user_input=user_input,
@@ -196,13 +218,17 @@ def handle_complain_submit(user_input, username, session_id, chat_history=None):
 
 
 def handle_trash_finder(user_input, username, session_id):
+    """쓰레기통 위치 찾기 시나리오의 대화를 처리합니다."""
     response = trash_chain.run({"user_input": user_input})
     final_response = truncate_to_full_sentence(response)
 
     return {"response": final_response}
 
 
+# --- 메인 라우터 함수 ---
+# 💡 사용자 요청을 분석하여 적절한 챗봇 시나리오로 연결하는 핵심 라우터입니다.
 def chatbot_router(user_input, username, session_id=None, scenario_id=None):
+    """사용자 입력에 따라 적절한 챗봇 시나리오를 호출합니다."""
     start_time = time.time()
 
     if session_id is None:

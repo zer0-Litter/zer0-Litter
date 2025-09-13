@@ -7,23 +7,33 @@ from common.models_mongo import ChatHistory, Counter, ChatFiles, Complaints
 from datetime import datetime
 import logging, os
 from uuid import uuid4
-from langchain.embeddings import OpenAIEmbeddings
-from langchain_community.vectorstores import Chroma
-from langchain.docstore.document import Document as LangchainDocument
 from config import settings
+from dotenv import load_dotenv
 
+# 💡 최신 LangChain 패키지에서 올바르게 임포트합니다.
+# 이전에 발생했던 오류를 해결하기 위한 핵심 수정 사항입니다.
+from langchain_openai import OpenAIEmbeddings
+from langchain_chroma import Chroma
+from langchain.docstore.document import Document as LangchainDocument
 
 logger = logging.getLogger(__name__)
-# 💡 임베딩 및 벡터 스토어 인스턴스를 파일 최상단에 추가
 
+# 💡 .env 파일에서 환경 변수를 로드합니다.
+load_dotenv()
 
-# 💡 임베딩 및 벡터 스토어 인스턴스 생성
-embeddings = OpenAIEmbeddings(api_key=settings.OPENAI_API_KEY)
-# 'persist_directory'를 지정해 데이터가 영구적으로 저장되도록 함
+# 💡 .env에서 ChromaDB 호스트 IP를 가져옵니다.
+CHROMA_DB_HOST = os.getenv("CHROMA_DB_HOST")
+
+# 💡 임베딩 및 벡터 스토어 인스턴스를 생성합니다.
+# 이 객체는 실행 중인 ChromaDB 서버에 연결됩니다.
 vector_store = Chroma(
     collection_name="complaint_embeddings",
-    embedding_function=embeddings,
-    persist_directory="./chroma_db"
+    embedding_function=OpenAIEmbeddings(api_key=settings.OPENAI_API_KEY),
+    client_settings={
+        "host": CHROMA_DB_HOST,
+        "port": 8000,
+        "chroma_api_impl": "chromadb.api.fastapi.FastAPI"  # 💡 이 한 줄을 추가해주세요.
+    }
 )
 
 
@@ -31,33 +41,35 @@ vector_store = Chroma(
 def initial_load_to_chroma():
     """MongoDB의 모든 민원 데이터를 ChromaDB로 로드합니다."""
 
-    # ChromaDB가 비어 있는지 확인
-    if not vector_store.get(where={})['ids']:
-        print("ChromaDB가 비어 있습니다. MongoDB에서 기존 민원 데이터를 로드합니다...")
+    # ChromaDB가 비어 있는지 확인합니다.
+    try:
+        if not vector_store.get(where={})['ids']:
+            print("ChromaDB가 비어 있습니다. MongoDB에서 기존 민원 데이터를 로드합니다...")
+            all_complaints = Complaints.objects()
+            documents = []
+            for complaint in all_complaints:
+                doc_to_embed = LangchainDocument(
+                    page_content=complaint.com_contents,
+                    metadata={
+                        "username": complaint.username,
+                        "com_id": complaint.com_id,
+                        "com_type": complaint.com_type
+                    }
+                )
+                documents.append(doc_to_embed)
 
-        all_complaints = Complaints.objects()
-        documents = []
-        for complaint in all_complaints:
-            # 민원 내용을 Langchain Document 객체로 변환
-            doc_to_embed = LangchainDocument(
-                page_content=complaint.com_contents,
-                metadata={
-                    "username": complaint.username,
-                    "com_id": complaint.com_id,
-                    "com_type": complaint.com_type
-                }
-            )
-            documents.append(doc_to_embed)
-
-        if documents:
-            vector_store.add_documents(documents)
-            print(f"MongoDB에서 총 {len(documents)}개의 민원 데이터를 ChromaDB에 로드 완료.")
-    else:
-        print("ChromaDB에 이미 데이터가 존재하여 초기 로드를 건너뜁니다.")
+            if documents:
+                vector_store.add_documents(documents)
+                print(f"MongoDB에서 총 {len(documents)}개의 민원 데이터를 ChromaDB에 로드 완료.")
+        else:
+            print("ChromaDB에 이미 데이터가 존재하여 초기 로드를 건너뜁니다.")
+    except Exception as e:
+        logger.error(f"ChromaDB 초기 로드 실패: {e}", exc_info=True)
 
 
-# 💡 서버 시작 시점에 함수를 호출하여 초기 로드를 수행
+# 💡 서버 시작 시점에 함수를 호출하여 초기 데이터를 로드합니다.
 initial_load_to_chroma()
+
 
 # -------- Counter 기반 ID 생성 --------
 def get_next_chat_id():
@@ -84,7 +96,6 @@ def get_next_session_id():
         return f"session_{uuid4()}"
 
 
-# -------- file_id 생성기 --------
 def get_next_file_id():
     try:
         counter = Counter.objects(name='file_id').modify(upsert=True, new=True, inc__seq=1)
@@ -97,8 +108,6 @@ def get_next_file_id():
         return f"file_{uuid4()}"
 
 
-# -------- complaint_id 생성 --------
-# 💡 챗봇 전용 카운터를 사용하고, 큰 오프셋을 더해 정수형 ID를 반환합니다.
 def get_next_chatbot_com_id():
     try:
         counter = Counter.objects(name='chatbot_com_id').modify(
@@ -271,6 +280,7 @@ def chatbot_api(request):
         'response': result.get('response', ''),
         'session_id': session_id
     })
+
 
 # ---------------- 기존 view 유지 ----------------
 @login_required
