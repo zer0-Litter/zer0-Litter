@@ -7,7 +7,8 @@ from langchain.chat_models import ChatOpenAI
 from langchain.chains import LLMChain
 from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import MongoDBAtlasVectorSearch
+# 💡 MongoDBAtlasVectorSearch 대신 Chroma import
+from langchain_community.vectorstores import Chroma
 from config import settings
 import logging
 
@@ -20,18 +21,18 @@ COLLECTIONS = {
     "history": db['chat_history'],
     "files": db['chat_files'],
     "complaints": db['complaints'],
-    "embeddings": db['complaint_embeddings']  # 새로운 임베딩 컬렉션
 }
 
 # --- LLM 및 임베딩 세팅 ---
 llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.7, max_tokens=100, api_key=settings.OPENAI_API_KEY)
 embeddings = OpenAIEmbeddings(api_key=settings.OPENAI_API_KEY)
 
-# 💡 Vector Store 인스턴스 생성
-vector_store = MongoDBAtlasVectorSearch(
-    collection=COLLECTIONS["embeddings"],
-    embedding=embeddings,
-    index_name="vector_index"
+# 💡 views.py에서 생성된 ChromaDB 인스턴스를 로드 (새로운 객체 생성)
+# 'persist_directory'를 지정해 기존에 저장된 임베딩 데이터를 사용하도록 함
+vector_store = Chroma(
+    collection_name="complaint_embeddings",
+    embedding_function=embeddings,
+    persist_directory="./chroma_db"
 )
 
 # --- 프롬프트 ---
@@ -130,26 +131,16 @@ def save_complaint(username, complaint_data):
 REQUIRED_FIELDS = ["com_type", "lat", "lon"]
 
 
-# 💡 새로운 함수: 과거 민원 기록 검색 (수정됨)
-def retrieve_complaint_history(query, username, num_results=3):  # num_results를 3개로 늘려 검색 후 필터링에 대비
-
-    # 'filter' 인자 없이 벡터 검색 실행
+# 💡 새로운 함수: 과거 민원 기록 검색 (ChromaDB용으로 수정)
+def retrieve_complaint_history(query, username, num_results=3):
     retrieved_docs_with_scores = vector_store.similarity_search_with_score(
         query=query,
         k=num_results
     )
 
     context = ""
-    user_specific_docs = []
-
-    # 검색된 문서들을 순회하며 username으로 필터링
-    for doc, score in retrieved_docs_with_scores:
-        if doc.metadata.get("username") == username:
-            user_specific_docs.append((doc, score))
-
-    # 필터링된 문서 중 상위 1개만 사용
-    if user_specific_docs:
-        doc, score = user_specific_docs[0]
+    if retrieved_docs_with_scores:
+        doc, score = retrieved_docs_with_scores[0]
         context = f"유사 민원: {doc.page_content} (관련도: {score:.2f})\n"
 
     return context.strip()

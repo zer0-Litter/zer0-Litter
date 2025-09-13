@@ -78,23 +78,3 @@ class ChatFiles(Document):
     meta = {'collection': 'chat_files'}
 
 
-# common/models_mongo.py 파일의 마지막 부분에 추가
-
-class ComplaintEmbeddings(Document):
-    """
-    민원 내용을 임베딩한 벡터와 메타데이터를 저장하는 모델입니다.
-    이 컬렉션은 벡터 검색을 위한 데이터 저장소로 사용됩니다.
-    """
-    username = StringField(max_length=255)
-    com_id = IntField(required=True)
-    com_type = StringField(max_length=255)
-    com_contents = StringField(max_length=255)
-    embedding = DictField(required=True)  # 임베딩된 벡터 데이터
-
-    meta = {
-        'collection': 'complaint_embeddings',
-        'indexes': [
-            {'fields': ['$com_contents'], 'default_language': 'korean'},
-            'username'
-        ]
-    }

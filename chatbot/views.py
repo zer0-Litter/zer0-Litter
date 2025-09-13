@@ -7,9 +7,57 @@ from common.models_mongo import ChatHistory, Counter, ChatFiles, Complaints
 from datetime import datetime
 import logging, os
 from uuid import uuid4
+from langchain.embeddings import OpenAIEmbeddings
+from langchain_community.vectorstores import Chroma
+from langchain.docstore.document import Document as LangchainDocument
+from config import settings
+
 
 logger = logging.getLogger(__name__)
+# 💡 임베딩 및 벡터 스토어 인스턴스를 파일 최상단에 추가
 
+
+# 💡 임베딩 및 벡터 스토어 인스턴스 생성
+embeddings = OpenAIEmbeddings(api_key=settings.OPENAI_API_KEY)
+# 'persist_directory'를 지정해 데이터가 영구적으로 저장되도록 함
+vector_store = Chroma(
+    collection_name="complaint_embeddings",
+    embedding_function=embeddings,
+    persist_directory="./chroma_db"
+)
+
+
+# 💡 새로운 함수: 기존 민원 데이터를 ChromaDB에 로드
+def initial_load_to_chroma():
+    """MongoDB의 모든 민원 데이터를 ChromaDB로 로드합니다."""
+
+    # ChromaDB가 비어 있는지 확인
+    if not vector_store.get(where={})['ids']:
+        print("ChromaDB가 비어 있습니다. MongoDB에서 기존 민원 데이터를 로드합니다...")
+
+        all_complaints = Complaints.objects()
+        documents = []
+        for complaint in all_complaints:
+            # 민원 내용을 Langchain Document 객체로 변환
+            doc_to_embed = LangchainDocument(
+                page_content=complaint.com_contents,
+                metadata={
+                    "username": complaint.username,
+                    "com_id": complaint.com_id,
+                    "com_type": complaint.com_type
+                }
+            )
+            documents.append(doc_to_embed)
+
+        if documents:
+            vector_store.add_documents(documents)
+            print(f"MongoDB에서 총 {len(documents)}개의 민원 데이터를 ChromaDB에 로드 완료.")
+    else:
+        print("ChromaDB에 이미 데이터가 존재하여 초기 로드를 건너뜁니다.")
+
+
+# 💡 서버 시작 시점에 함수를 호출하여 초기 로드를 수행
+initial_load_to_chroma()
 
 # -------- Counter 기반 ID 생성 --------
 def get_next_chat_id():
@@ -199,17 +247,30 @@ def chatbot_api(request):
                 elif i == 1:
                     complaint_data["com_pic2"] = file.file_data
 
+            # 💡 1. MongoDB에 민원 정보 저장
             Complaints(**complaint_data).save()
             print(f"Complaints 저장 완료: com_id={complaint_id}")
 
+            # 💡 2. 임베딩을 생성하여 ChromaDB에 저장
+            # 메타데이터를 포함하여 나중에 검색 결과 필터링에 활용할 수 있게 함
+            doc_to_embed = LangchainDocument(
+                page_content=user_input,
+                metadata={
+                    "username": username,
+                    "com_id": complaint_id,
+                    "com_type": com_type_from_router
+                }
+            )
+            vector_store.add_documents([doc_to_embed])
+            print("ChromaDB에 임베딩 저장 완료")
+
     except Exception as e:
-        logger.error(f"Complaints 자동 생성 실패: {e}", exc_info=True)
+        logger.error(f"Complaints 및 임베딩 자동 생성 실패: {e}", exc_info=True)
 
     return JsonResponse({
         'response': result.get('response', ''),
         'session_id': session_id
     })
-
 
 # ---------------- 기존 view 유지 ----------------
 @login_required
