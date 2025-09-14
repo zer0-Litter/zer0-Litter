@@ -10,6 +10,9 @@ from langchain.chains import LLMChain
 # 핵심 요소: langchain-core 패키지에서 임포트
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 
+# 💡 **langchain_chroma 대신 직접 chromadb 클라이언트를 사용**
+from chromadb import HttpClient
+
 # 외부 연동: langchain-openai, langchain-chroma 등에서 임포트
 from langchain_openai import ChatOpenAI
 from langchain_openai import OpenAIEmbeddings
@@ -39,15 +42,17 @@ embeddings = OpenAIEmbeddings(api_key=settings.OPENAI_API_KEY)
 # 💡 ChromaDB 호스트 IP를 환경 변수에서 가져옵니다.
 CHROMA_DB_HOST = os.getenv("CHROMA_DB_HOST")
 
-# 💡 벡터 스토어 인스턴스를 생성하여 ChromaDB에 연결합니다.
+# 💡 **[핵심 수정]** 직접 chromadb 클라이언트를 생성합니다.
+chroma_client = HttpClient(
+    host=CHROMA_DB_HOST,
+    port=8000
+)
+
+# 💡 생성한 클라이언트를 vector_store에 전달합니다.
 vector_store = Chroma(
     collection_name="complaint_embeddings",
     embedding_function=embeddings,
-    client_settings={
-        "host": CHROMA_DB_HOST,
-        "port": 8000,
-        "chroma_api_impl": "chromadb.api.fastapi.FastAPI"  # 💡 이 한 줄을 추가해주세요.
-    }
+    client=chroma_client # 💡 client_settings 대신 client를 사용
 )
 
 # --- 프롬프트 정의 ---
@@ -56,7 +61,7 @@ trash_prompt = ChatPromptTemplate.from_messages([
     SystemMessagePromptTemplate.from_template("당신은 쓰레기통 위치 안내 챗봇입니다."),
     HumanMessagePromptTemplate.from_template("사용자 질문: {user_input}")
 ])
-trash_chain = LLMChain(llm=llm, prompt=trash_prompt)
+trash_chain = trash_prompt | llm
 
 # 💡 민원 유형을 분류하고, 필요시 질문을 생성하는 통합 프롬프트입니다.
 _complaint_chain_prompt = ChatPromptTemplate.from_messages([

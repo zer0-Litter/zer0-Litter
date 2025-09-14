@@ -10,11 +10,14 @@ from uuid import uuid4
 from config import settings
 from dotenv import load_dotenv
 
+
 # 💡 최신 LangChain 패키지에서 올바르게 임포트합니다.
-# 이전에 발생했던 오류를 해결하기 위한 핵심 수정 사항입니다.
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
 from langchain.docstore.document import Document as LangchainDocument
+# 💡 [수정] LangChain 1.0.0 이후 버전에서는 LLMChain이 deprecated 되었습니다.
+#    아래 경고가 표시될 경우 chatbot_core.py에서 수정이 필요합니다.
+from langchain.chains import LLMChain
 
 logger = logging.getLogger(__name__)
 
@@ -24,16 +27,23 @@ load_dotenv()
 # 💡 .env에서 ChromaDB 호스트 IP를 가져옵니다.
 CHROMA_DB_HOST = os.getenv("CHROMA_DB_HOST")
 
-# 💡 임베딩 및 벡터 스토어 인스턴스를 생성합니다.
-# 이 객체는 실행 중인 ChromaDB 서버에 연결됩니다.
+
+# 💡 **[핵심 수정]** ChromaDB가 로컬에서 실행 중이 아닌 경우에만 클라이언트를 임포트합니다.
+#    로컬에서는 기본 설정으로 충분합니다.
+if CHROMA_DB_HOST:
+    from chromadb import HttpClient
+    chroma_client = HttpClient(host=CHROMA_DB_HOST, port=8000)
+else:
+    chroma_client = None
+
+
+# 💡 생성한 클라이언트를 vector_store에 전달합니다.
+#    `client_settings` 대신 `client`를 사용하는 것이 최신 버전의 올바른 방식입니다.
 vector_store = Chroma(
     collection_name="complaint_embeddings",
     embedding_function=OpenAIEmbeddings(api_key=settings.OPENAI_API_KEY),
-    client_settings={
-        "host": CHROMA_DB_HOST,
-        "port": 8000,
-        "chroma_api_impl": "chromadb.api.fastapi.FastAPI"  # 💡 이 한 줄을 추가해주세요.
-    }
+    persist_directory="./chroma_db",
+    client=chroma_client if CHROMA_DB_HOST else None
 )
 
 
@@ -43,17 +53,24 @@ def initial_load_to_chroma():
 
     # ChromaDB가 비어 있는지 확인합니다.
     try:
-        if not vector_store.get(where={})['ids']:
+        if vector_store._collection.count() == 0:
             print("ChromaDB가 비어 있습니다. MongoDB에서 기존 민원 데이터를 로드합니다...")
             all_complaints = Complaints.objects()
             documents = []
             for complaint in all_complaints:
+                # 💡 **[핵심 수정]** `com_type` 필드의 값이 리스트인지 확인하고,
+                #    리스트일 경우 첫 번째 요소만 추출하여 문자열로 변환합니다.
+                #    ChromaDB는 metadata 값으로 리스트를 허용하지 않습니다.
+                com_type_value = complaint.com_type
+                if isinstance(com_type_value, list) and com_type_value:
+                    com_type_value = com_type_value[0]
+
                 doc_to_embed = LangchainDocument(
                     page_content=complaint.com_contents,
                     metadata={
                         "username": complaint.username,
                         "com_id": complaint.com_id,
-                        "com_type": complaint.com_type
+                        "com_type": com_type_value  # 💡 수정된 값을 사용
                     }
                 )
                 documents.append(doc_to_embed)
@@ -65,7 +82,6 @@ def initial_load_to_chroma():
             print("ChromaDB에 이미 데이터가 존재하여 초기 로드를 건너뜁니다.")
     except Exception as e:
         logger.error(f"ChromaDB 초기 로드 실패: {e}", exc_info=True)
-
 
 # 💡 서버 시작 시점에 함수를 호출하여 초기 데이터를 로드합니다.
 initial_load_to_chroma()
