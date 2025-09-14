@@ -4,15 +4,15 @@ import time
 from pymongo import MongoClient, ReturnDocument
 from dotenv import load_dotenv
 
-# 💡 최신 LangChain 패키지에서 올바르게 임포트합니다.
-# 이전에 발생했던 오류를 해결하기 위한 핵심 수정 사항입니다.
+# 챗봇의 핵심 기능: 메인 langchain 패키지에서 임포트
+from langchain.chains import LLMChain
+
+# 핵심 요소: langchain-core 패키지에서 임포트
+from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
+
+# 외부 연동: langchain-openai, langchain-chroma 등에서 임포트
 from langchain_openai import ChatOpenAI
 from langchain_openai import OpenAIEmbeddings
-
-from langchain.chains import LLMChain
-from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
-
-# 💡 langchain_community.vectorstores 대신 langchain_chroma 사용
 from langchain_chroma import Chroma
 from config import settings
 import logging
