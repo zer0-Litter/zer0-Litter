@@ -104,7 +104,6 @@ def complain_add(request):
         com_id=new_com_id,
         username=username,
         com_type=com_type,
-        com_title=f"{com_type or '민원'} 신고",   # ← 기본값 보강
         com_contents=com_contents,
         com_location=com_location,
         com_reg_date=timezone.now(),
@@ -200,7 +199,6 @@ def old_complaints_api(request):
 
         items.append({
             "com_id": c.com_id,
-            "title": c.com_title or f"{type_display or '민원'} 신고",
             "type": type_display,
             "date": c.com_reg_date.strftime('%Y-%m-%d') if c.com_reg_date else "",
             "location": c.com_location or "",
