@@ -14,8 +14,10 @@ from langchain_core.output_parsers import StrOutputParser
 from chromadb import HttpClient
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_chroma import Chroma
-from config import settings
+from konlpy.tag import Okt
 import logging
+
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,7 @@ COLLECTIONS = {
 
 llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.7, max_tokens=70, api_key=settings.OPENAI_API_KEY)
 embeddings = OpenAIEmbeddings(api_key=settings.OPENAI_API_KEY)
+okt = Okt()
 
 CHROMA_DB_HOST = os.getenv("CHROMA_DB_HOST")
 
@@ -73,6 +76,32 @@ _complaint_chain_prompt = ChatPromptTemplate.from_messages([
 ])
 complaint_chain = _complaint_chain_prompt | llm | StrOutputParser()
 
+# --- 전처리 함수 ---
+def preprocess_text(text):
+    """
+    텍스트를 전처리하여 명사만 추출하고 불용어를 제거합니다.
+    """
+    if not isinstance(text, str):
+        return ""
+
+    # 1. 특수문자 제거
+    # 한글, 영문, 숫자, 공백만 남깁니다.
+    text = re.sub(r'[^\s\w]', '', text)
+
+    # 2. Okt를 사용하여 명사 추출
+    nouns = okt.nouns(text)
+
+    # 3. 불용어 제거
+    # 사용자가 언급한 조사들을 포함하여 더 포괄적인 불용어 목록을 정의합니다.
+    stopwords = [
+        '은', '는', '이', '가', '을', '를', '의', '에', '에서', '에게', '로', '으로',
+        '와', '과', '고', '에게', '한테', '처럼', '만큼',
+        '것', '곳', '다', '등', '내', '저', '수', '점', '말', '그', '때', '후', '때문'
+    ]
+    processed_text = ' '.join([word for word in nouns if word not in stopwords])
+
+    return processed_text
+
 
 # --- 유틸리티 함수: 사용자 입력 처리 및 데이터 조회 ---
 
@@ -104,8 +133,10 @@ def get_langchain_history(chat_history):
 
 def retrieve_complaint_history(query, username, num_results=3):
     """ChromaDB에서 유사한 민원 기록을 검색합니다."""
+    # 전처리를 적용한 쿼리로 검색
+    preprocessed_query = preprocess_text(query)
     retrieved_docs_with_scores = vector_store.similarity_search_with_score(
-        query=query,
+        query=preprocessed_query,
         k=num_results
     )
     context = ""
@@ -158,6 +189,13 @@ def handle_complain_submit(user_input, username, session_id, chat_history):
     is_final = len(com_types) > 0
 
     if is_final:
+        # 전처리된 텍스트를 벡터화하여 ChromaDB에만 저장
+        try:
+            preprocessed_text = preprocess_text(user_input)
+            vector_store.add_texts(texts=[preprocessed_text])
+        except Exception as e:
+            logger.error(f"ChromaDB에 민원 벡터화 실패: {e}", exc_info=True)
+
         response_types = '와 '.join(com_types) if len(com_types) > 1 else com_types[0]
         response = f"{response_types}이 완료되었습니다. 감사합니다."
     else:

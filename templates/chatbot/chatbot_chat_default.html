@@ -10,34 +10,34 @@
 
 {% block content %}
 <div class="chatbot-container">
-
-  <div class="chat-window" id="chatWindow">
-    <div class="chat-message assistant">
-      <div class="message-bubble">
-        <span class="icon">🤖</span>
-        <span class="text">
-          안녕하세요, <strong>AI 오엘</strong>입니다!<br>
-          아래의 버튼 중 원하는 버튼을 선택해 주세요 😊
-        </span>
-      </div>
-    </div>
-
-    <div class="scenario-buttons" style="margin-top: 10px;">
+    <div class="scenario-buttons-fixed">
       <button class="scenario-btn" onclick="startScenario('trash_finder')">🗑️ 쓰레기통 찾기</button>
       <button class="scenario-btn" onclick="startScenario('complain_submit')">📝 민원 제보하기</button>
     </div>
-  </div>
 
-  <form class="chat-input" id="chatForm">
-    {% csrf_token %}
-    <input type="text" id="messageInput" placeholder="메시지를 입력하세요..." autocomplete="off" />
-    <input type="hidden" id="latitudeInput" name="latitude">
-    <input type="hidden" id="longitudeInput" name="longitude">
-    <label for="fileUpload" class="file-label">📷</label>
-    <input type="file" id="fileUpload" name="file" accept="image/*" capture="environment" style="display:none;" onchange="uploadFile()">
-    <button type="submit">전송</button>
+    <div class="chatbot-main">
+        <div class="chat-window" id="chatWindow">
+            <div class="chat-message assistant">
+                <div class="message-bubble">
+                    <span class="icon">🤖</span>
+                    <span class="text">
+                        안녕하세요, <strong>AI 오엘</strong>입니다!<br>
+                        원하는 버튼을 선택해 주세요 😊
+                    </span>
+                </div>
+            </div>
+            </div>
 
-  </form>
+        <form class="chat-input" id="chatForm">
+            {% csrf_token %}
+            <input type="text" id="messageInput" placeholder="메시지를 입력하세요..." autocomplete="off" />
+            <input type="hidden" id="latitudeInput" name="latitude">
+            <input type="hidden" id="longitudeInput" name="longitude">
+            <label for="fileUpload" class="file-label">📷</label>
+            <input type="file" id="fileUpload" name="file" accept="image/*" capture="environment" style="display:none;" onchange="uploadFile()">
+            <button type="submit">전송</button>
+        </form>
+    </div>
 </div>
 
 <script>
@@ -194,7 +194,4 @@ document.getElementById('chatForm').addEventListener('submit', function(e) {
   input.value = '';
 });
 </script>
-
-
-
 {% endblock %}
