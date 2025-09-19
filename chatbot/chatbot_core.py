@@ -65,17 +65,22 @@ _complaint_chain_prompt = ChatPromptTemplate.from_messages([
         "사용자의 민원을 '청소요청', '수리요청', '추가요청', '기타민원' 중 하나 또는 여러 개로 분류하세요. "
         "청소요청, 수리요청, 추가요청, 기타민원 중에 어떤 건지 넣어줘. 중복도 가능해. 청소요청은 쓰레기통이나 쓰레기통이 없어도 가능한 요청이고, 수리요청 추가요청은 쓰레기통에 대한 내용들이야. 그 이외에는 기타민원으로 넣으면 돼 "
         "만약 사용자가 '쓰레기통'과 관련된 민원을 제기하면, '청소요청' 또는 '수리요청'으로 분류하세요."
-        "만약 여러 개의 유형이라면 쉼표(,)로 구분하세요. (예: 청소요청,수리요청)"
+        "만약 '무단투기', '상습적으로 버린다', '자주 버린다' 같은 키워드가 포함되면 '기타민원'으로 분류하세요."
+        "만약 여러 개의 유형이라면 쉼표(,)로 구분하세요. (예: 청소요청,기타민원)"
         "만약 분류가 명확하지 않다면, 공감하며 자연스러운 질문을 생성하여 추가 정보를 요청하세요."
         "예시: '많이 불편하셨겠어요. 쓰레기통이 가득 찬 건가요, 아니면 주변에 쓰레기가 쌓여 있는 건가요?'"
         "오직 분류 결과(유형)나 질문(문장)만 반환하세요."
-        "민원 타입이 추론되면 예. '청소 요청과 쓰레기통 추가요청이 완료되었습니다'.를 반환하면 돼."
+        "기타 민원의 경우에는 정책 제안이나 쓰레기 무단투기 단속 강화 등이 있을 수 있어."
+        "민원 타입이 추론되면 사용자에게 해당 유형이 맞는지 물어보고 확정하세요. "
+        "예시: '쓰레기가 많이 쌓여서 청소요청이 필요하시다는 말씀이실까요?'"
+        "사용자가 '네', '맞아', '접수해줘'와 같이 긍정적으로 확인하면, 최종적으로 '민원 접수가 완료되었습니다.'와 같은 확정 문장을 반환하세요."
         "최대한 간결하고 짧게 답변하세요."
     ),
     MessagesPlaceholder(variable_name="chat_history"),
     HumanMessagePromptTemplate.from_template("이전 민원 기록: {retrieved_context}\n\n사용자 발화: {user_input}")
 ])
 complaint_chain = _complaint_chain_prompt | llm | StrOutputParser()
+
 
 # --- 전처리 함수 ---
 def preprocess_text(text):
@@ -124,6 +129,16 @@ def classify_scenario(user_input):
 def get_chat_history_from_db(session_id):
     """MongoDB에서 채팅 기록을 불러옵니다."""
     return list(COLLECTIONS["history"].find({"session_id": session_id}).sort("created_at", 1))
+
+
+def get_full_user_complaint_from_history(chat_history):
+    """채팅 기록에서 사용자의 모든 민원 관련 발화를 추출합니다."""
+    full_complaint_text = []
+    # complain_submit 시나리오에서 사용자의 발화만 추출
+    for chat in chat_history:
+        if chat.get('scenario_id') == 'complain_submit' and chat['role'] == 'user':
+            full_complaint_text.append(chat['content'])
+    return " ".join(full_complaint_text).strip()
 
 
 def get_langchain_history(chat_history):
@@ -187,30 +202,59 @@ def handle_complain_submit(user_input, username, session_id, chat_history):
         return {"response": "민원 유형을 파악하는 데 실패했습니다. 다시 말씀해주시겠어요?", "com_type": None, "is_final": False}
 
     com_types = extract_complaint_types(llm_output)
-    is_final = len(com_types) > 0
+
+    # LLM이 '완료되었습니다'와 같은 확정 문장을 반환했을 때만 is_final을 True로 설정
+    # 그렇지 않으면, 질문을 던지는 단계이므로 is_final은 False
+    is_final = ("완료되었습니다." in llm_output or "제보하겠습니다." in llm_output or "접수되었습니다." in llm_output)
 
     if is_final:
         try:
-            preprocessed_text = preprocess_text(user_input)
+            # 민원 접수 시, 전체 민원 내용을 추출하여 저장
+            full_user_complaint = get_full_user_complaint_from_history(chat_history)
 
-            # 여기서 com_type을 단일 문자열로 변환합니다.
+            # MongoDB에 민원 기록을 저장하는 로직
+            complaint_doc = {
+                "com_id": COLLECTIONS["complaints"].database.counters.find_one_and_update(
+                    {'_id': 'com_id'},
+                    {'$inc': {'seq': 1}},
+                    upsert=True,
+                    return_document=ReturnDocument.AFTER
+                )['seq'],
+                "username": username,
+                "com_type": ','.join(com_types),
+                "com_contents": full_user_complaint,  # 수정된 부분: 전체 민원 내용 저장
+                "com_reg_date": datetime.now(timezone.utc)
+            }
+            COLLECTIONS["complaints"].insert_one(complaint_doc)
+            logger.info(f"Complaints 저장 완료: com_id={complaint_doc['com_id']}")
+
+            # ChromaDB에 임베딩 저장
+            preprocessed_text = preprocess_text(full_user_complaint)
             com_type_string = ','.join(com_types)
-
-            # 벡터와 함께 메타데이터를 저장하도록 수정합니다.
             if preprocessed_text:
                 vector_store.add_texts(
                     texts=[preprocessed_text],
                     metadatas=[{"com_type": com_type_string}]
                 )
-        except Exception as e:
-            logger.error(f"ChromaDB에 민원 벡터화 실패: {e}", exc_info=True)
+            logger.info("ChromaDB에 임베딩 저장 완료")
 
-        response_types = '와 '.join(com_types) if len(com_types) > 1 else com_types[0]
-        response = f"{response_types}이 완료되었습니다. 감사합니다."
+        except Exception as e:
+            logger.error(f"민원 데이터 저장 실패: {e}", exc_info=True)
+
+        response = llm_output
     else:
         response = llm_output
+        if not com_types:
+            # LLM이 유형을 추론하지 않고 질문만 반환한 경우
+            response = llm_output
+        else:
+            # LLM이 유형을 추론했지만, 완료 메시지가 아닌 질문을 반환한 경우
+            # 이 경우는 LLM이 프롬프트 지시에 따라 질문을 생성한 것이므로
+            # 응답을 그대로 사용
+            response = llm_output
 
     return {"response": response, "com_type": com_types, "is_final": is_final}
+
 
 def handle_trash_finder(user_input, username, session_id):
     """쓰레기통 위치 안내 시나리오를 처리하고 라우터에 결과를 반환합니다."""
