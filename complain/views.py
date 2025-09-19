@@ -4,11 +4,13 @@ from django.shortcuts import render, redirect
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 from common.models_mongo import Complaints, ComplaintStatus, Counter, ReComplaints
+from common.models import TrashLoc
 from django.http import Http404, JsonResponse
 from uuid import uuid4
 from mongoengine.queryset.visitor import Q
 from datetime import datetime, timedelta
 from django.core.paginator import Paginator
+import os
 
 def init_or_fix_all_counters():
     # --- complaints의 com_id 카운터 초기화 ---
@@ -41,42 +43,41 @@ def get_next_status_id():
 
 @login_required(login_url='accounts:login')
 def complain_add(request):
-    if request.method == 'GET':
-        username = request.user.username
-        qs = Complaints.objects(username=username).order_by('-com_reg_date')[:10]
+    username = request.user.username
 
+    if request.method == "GET":
+        lat = request.GET.get("lat")
+        lon = request.GET.get("lon")
+        address = request.GET.get("address")
+
+        qs = Complaints.objects(username=username).order_by('-com_reg_date')[:10]
         all_complaints = []
         for c in qs:
-            # 타입 문자열 통일
-            if isinstance(c.com_type, list):
-                type_display = ', '.join([t.strip() for t in c.com_type if str(t).strip()])
-            else:
-                type_display = ', '.join([s.strip() for s in str(c.com_type).split(',') if s.strip()])
-
+            type_display = ', '.join(c.com_type) if isinstance(c.com_type, list) else c.com_type
             all_complaints.append({
                 "com_id": c.com_id,
-                "com_type": type_display,  # ← 템플릿이 기대하는 키
+                "com_type": type_display,
                 "com_location": c.com_location or "",
                 "com_contents": c.com_contents or "",
                 "com_reg_date": c.com_reg_date.strftime('%Y-%m-%d') if c.com_reg_date else "",
             })
 
         return render(request, 'complain/complain_add.html', {
+            'kakao_api_key': os.getenv('KAKAO_MAP_API_KEY'),
+            'district_id': '11000',
+            'address': address,
+            'lat': lat,
+            'lon': lon,
+            'initial': {'lat': lat, 'lon': lon, 'address': address},
             'today_date': timezone.now().strftime('%Y-%m-%d'),
-            'is_reuse': request.GET.get('is_reuse', 'N'),
-            'origin_com_id': request.GET.get('origin_com_id', ''),
-            'all_complaints': all_complaints,  # ★ 여기!
+            'all_complaints': all_complaints,
         })
 
-    username = request.user.username
+    # POST 요청: 민원 저장
     com_types = [t.strip() for t in request.POST.getlist('com_type') if t.strip()]
-    com_type = ', '.join(com_types)  # 화면/제목용 문자열
+    com_type = ', '.join(com_types)
     com_contents = (request.POST.get('com_contents') or '').strip()
     com_location = (request.POST.get('com_location') or '').strip()
-
-    # (옵션) 지역 기본 prefix
-    if com_location and not com_location.startswith("서울특별시"):
-        com_location = "서울특별시 " + com_location
 
     # 재민원 플래그/원본 com_id
     is_reuse = (request.POST.get('is_reuse') == 'Y')
@@ -96,6 +97,15 @@ def complain_add(request):
     pic1_data = com_pic1.read() if com_pic1 else None
     pic2_data = com_pic2.read() if com_pic2 else None
 
+    # 위치
+    lat_raw = request.POST.get('lat')
+    lon_raw = request.POST.get('lon')
+    lat = float(lat_raw) if lat_raw else None
+    lon = float(lon_raw) if lon_raw else None
+
+    # 위도경도저장확인용
+    print(f"[DEBUG] lat={lat}, lon={lon}")
+
     # 새 com_id
     new_com_id = get_next_com_id()   # ← 변수명 통일
 
@@ -113,6 +123,8 @@ def complain_add(request):
         com_trashcan="",
         com_trash_type="",
         re_complain='Y' if is_reuse else 'N',   # ← 중복 제거 (한 번만)
+        lat=lat,
+        lon=lon,
     )
     complaint.save()
 
@@ -141,6 +153,29 @@ def complain_add(request):
     from django.contrib import messages
     messages.success(request, '민원이 정상적으로 등록되었습니다.')
     return redirect('accounts:mypage_home')
+
+
+def trash_bin_map(request, district_id=None):
+    if district_id:
+        trashcans = TrashLoc.objects.filter(t_district_id=district_id)
+    else:
+        trashcans = TrashLoc.objects.all()
+
+    data = [
+        {
+            "t_lat": float(t.t_lat),
+            "t_lon": float(t.t_lon),
+            "t_road_addr": t.t_addr,
+            "t_detailed_addr": t.t_detailed_addr,
+            "t_trash_type": t.t_trash_type,
+            "t_loc": t.t_loc,
+            "t_dept": t.t_dept,
+            "t_contact": t.t_contact,
+            "t_district_id": t.t_district_id,
+        }
+        for t in trashcans
+    ]
+    return JsonResponse(data, safe=False)
 
 
 @login_required(login_url='accounts:login')

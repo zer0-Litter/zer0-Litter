@@ -4,6 +4,7 @@
 {% block title %}민원 제보{% endblock %}
 
 {% block extra_head %}
+  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={{ kakao_api_key }}&autoload=false&libraries=services"></script>
   <link rel="stylesheet" href="{% static 'css/complain_add.css' %}">
 {% endblock %}
 
@@ -20,8 +21,79 @@
 
   <div>
     <label for="com_location"><strong>위치(테스트용)</strong></label>
-    <input type="text" name="com_location" id="com_location" value="{{ initial.location|default:'' }}" placeholder="구+도로명+번호까지 입력해주세요" required style="width: 100%;" />
+    {% if address %}
+    <!-- 쓰레기통 모달에서 넘어온 경우 → 주소 자동 입력 + 수정 가능 -->
+    <input type="text"
+           name="com_location"
+           id="com_location_from_modal"
+           value="{{ address }}"
+           style="width: 100%;" />
+    {% elif initial.address %}
+    <!-- 홈에서 넘어온 경우 → 주소 자동 입력 + 수정 불가 -->
+    <input type="text"
+           name="com_location"
+           value="{{ initial.location }}"
+           readonly
+           style="width: 100%;" />
+    <input type="hidden" name="trash_id" value="{{ initial.trash_id }}">
+    {% else %}
+    <!-- 직접 들어온 경우 → 빈칸 -->
+    <input type="text"
+           name="com_location"
+           id="com_location"
+           placeholder="구+도로명+번호까지 입력해주세요"
+           required
+           style="width: 100%;" />
+    {% endif %}
+    <!-- 🔹 지도 바로 표시 -->
+    <div id="map" style="width:100%; height:250px; margin-top:8px; border-radius:8px; position:relative;">
+        <div id="fixed-pin"></div>
+    </div>
+
+    <!-- 🔹 lat/lon hidden field 항상 존재 -->
+    <input type="hidden" id="lat-input" name="lat" value="{{ lat|default:initial.lat|default:'' }}">
+    <input type="hidden" id="lon-input" name="lon" value="{{ lon|default:initial.lon|default:'' }}">
   </div>
+    <!-- 쓰레기통 상세 정보 모달 -->
+    <div id="trashDetailModal" style="display:none;">
+      <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+
+        <!-- 쓰레기통 이미지 -->
+        <div class="trash-image">
+          <img id="trashImage" src="/static/img/default_bin.png" alt="쓰레기통 사진">
+        </div>
+
+        <!-- 주소 및 상세 정보 -->
+        <div class="trash-info">
+          <h3 id="trashAddressMain">주소 정보 없음</h3>
+
+          <div class="trash-type-wrap">
+            <div class="trash-type" id="type1">
+              <img src="/static/img/icon_trash.png" alt="">
+              <div>
+                <div class="type-name" id="type1-name">일반 쓰레기</div>
+                <div class="type-loc" id="type1-loc">위치: -</div>
+              </div>
+            </div>
+            <div class="trash-type" id="type2">
+              <img src="/static/img/icon_recycle.png" alt="">
+              <div>
+                <div class="type-name" id="type2-name">재활용</div>
+                <div class="type-loc" id="type2-loc">위치: -</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 버튼 -->
+        <div class="modal-buttons">
+          <button class="btn-find" id="btnFind">길찾기</button>
+          <button class="btn-report" id="btnReport">신고하기</button>
+        </div>
+      </div>
+    </div>
+
 
 
   <div>
@@ -83,7 +155,232 @@
 {{ all_complaints|json_script:"complaints-data" }}
 
 <script>
+    let map;
+    let markers = [];
+    let userPosition = null;
+    let trashList = [];
 
+    let grayMarkerImage;
+    let yellowMarkerImage;
+
+    const districtId = "{{ district_id }}";
+
+    function computeDistanceByPolyline(pos1, pos2) {
+      if (!pos1 || !pos2) return Infinity;
+      const line = new kakao.maps.Polyline({ path: [pos1, pos2] });
+      return line.getLength();
+    }
+
+    function initMap() {
+      // 지도 생성
+      map = new kakao.maps.Map(document.getElementById('map'), {
+        center: new kakao.maps.LatLng(37.5665, 126.9780),
+        level: 5
+      });
+
+      // 마커 이미지
+      grayMarkerImage = new kakao.maps.MarkerImage(
+        '/static/img/marker_trash_gray.png',
+        new kakao.maps.Size(32, 40)
+      );
+      yellowMarkerImage = new kakao.maps.MarkerImage(
+        '/static/img/marker_trash_yellow_outline_2px.png',
+        new kakao.maps.Size(32, 42)
+      );
+
+      // geocoder 생성
+      const geocoder = new kakao.maps.services.Geocoder();
+
+
+      // 내 위치 가져오기
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(position => {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          userPosition = new kakao.maps.LatLng(lat, lon);
+          map.setCenter(userPosition);
+
+          // 최초 좌표 반영
+          document.getElementById('lat-input').value = lat;
+          document.getElementById('lon-input').value = lon;
+
+          loadTrashcans(lat, lon);
+          updateAddressInput(userPosition);
+        }, () => {
+          setDefaultCenter();
+        });
+      } else {
+        setDefaultCenter();
+      }
+
+      // ✅ 지도 움직일 때마다 중심 좌표를 hidden input에 업데이트
+      kakao.maps.event.addListener(map, 'center_changed', function () {
+            const center = map.getCenter();
+            const lat = center.getLat();
+            const lng = center.getLng();
+
+            // hidden input
+            document.getElementById('lat-input').value = lat;
+            document.getElementById('lon-input').value = lng;
+
+            // 지도 중앙 좌표 → 주소 변환
+            updateAddressInput(center);
+        });
+
+        // 주소 업데이트 함수
+        function updateAddressInput(latlng) {
+            geocoder.coord2Address(latlng.getLng(), latlng.getLat(), function(result, status) {
+                if (status === kakao.maps.services.Status.OK) {
+                    const addr = result[0].address.address_name;
+                    const inputEl = document.getElementById('com_location') || document.getElementById('com_location_from_modal');
+                    if (inputEl && !inputEl.readOnly) {
+                        inputEl.value = addr;
+                    }
+                }
+            });
+        }
+    }
+
+    function setDefaultCenter() {
+      const defaultLat = 37.5665, defaultLon = 126.9780;
+      userPosition = new kakao.maps.LatLng(defaultLat, defaultLon);
+      map.setCenter(userPosition);
+
+      document.getElementById('lat-input').value = defaultLat;
+      document.getElementById('lon-input').value = defaultLon;
+
+      loadTrashcans(defaultLat, defaultLon);
+    }
+
+    // 🟢 Kakao Maps API 로드 후 initMap 호출
+    kakao.maps.load(initMap);
+
+    function loadTrashcans(lat, lon, radius = 10000) {
+      fetch(`/trash_loc/list/${districtId}/?lat=${lat}&lon=${lon}&radius=${radius}`)
+        .then(res => res.json())
+        .then(data => {
+          markers.forEach(m => m.setMap(null));
+          markers = [];
+          trashList = [];
+
+          data.forEach(trash => {
+            if (!trash.t_lat || !trash.t_lon) return;
+            const position = new kakao.maps.LatLng(trash.t_lat, trash.t_lon);
+            const distance = computeDistanceByPolyline(userPosition || new kakao.maps.LatLng(lat, lon), position);
+            if (!isFinite(distance)) return;
+            trashList.push({ ...trash, distance });
+          });
+
+          trashList.forEach(trash => {
+            const position = new kakao.maps.LatLng(trash.t_lat, trash.t_lon);
+            const marker = new kakao.maps.Marker({
+              map: map,
+              position: position,
+              title: trash.t_road_addr,
+              image: grayMarkerImage, // 추천 마커는 나중에 따로 처리
+              clickable: true
+            });
+
+            kakao.maps.event.addListener(marker, 'click', () => showTrashDetail(trash));
+            markers.push(marker);
+          });
+         });
+    }
+
+
+    function showTrashDetail(trash) {
+      // 타입 표준화
+      let type = trash.t_trash_type || "알 수 없음";
+      if (type === "가로쓰레기통") type = "일반쓰레기통";
+      if (type === "일반쓰레기") type = "일반쓰레기통";
+      if (type === "재활용쓰레기") type = "재활용";
+
+      const trashImageMap = {
+        "재활용": "/static/img/recycle_bin.png",
+        "일반쓰레기통": "/static/img/street_bin.png",
+        "서리풀컵": "/static/img/seripoolcup.png"
+      };
+      const imageSrc = trash.t_image_url || trashImageMap[type] || "/static/images/trashcans/default.png";
+      document.getElementById('trashImage').src = imageSrc;
+
+      document.getElementById('trashAddressMain').innerText = trash.t_road_addr || '주소 정보 없음';
+
+      const type1El = document.getElementById('type1');
+      const type2El = document.getElementById('type2');
+
+      // 일반쓰레기 블록
+      if (type.includes("일반")) {
+        type1El.style.display = 'flex';
+        document.getElementById('type1-name').innerText = '일반쓰레기';
+        document.getElementById('type1-loc').innerText = trash.t_loc ? '위치: ' + trash.t_loc : '';
+      } else {
+        type1El.style.display = 'none';
+      }
+
+      // 재활용 블록
+      if (type.includes("재활용")) {
+        type2El.style.display = 'flex';
+        document.getElementById('type2-name').innerText = '재활용';
+        document.getElementById('type2-loc').innerText = trash.t_recycle_loc ? '위치: ' + trash.t_recycle_loc : '';
+      } else {
+        type2El.style.display = 'none';
+      }
+
+      // 🔹 신고하기 버튼
+      document.getElementById('btnReport').onclick = function () {
+        if (!navigator.geolocation) {
+          alert("⚠️ 위치 정보를 가져올 수 없습니다. 주소를 직접 입력해주세요.");
+          window.location.href = `/complain_add/?address=${encodeURIComponent(trash.t_road_addr || "")}`;
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(position => {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+
+          // 신고 페이지로 주소 + 위도/경도 전달
+          const url = `/complain_add/?address=${encodeURIComponent(trash.t_road_addr || "")}&lat=${lat}&lon=${lon}`;
+          window.location.href = url;
+
+        }, () => {
+          // 권한 거부 시 주소만 전달
+          const url = `/complain_add/?address=${encodeURIComponent(trash.t_road_addr || "")}`;
+          window.location.href = url;
+        });
+      };
+
+      // 길찾기 버튼
+      document.getElementById('btnFind').onclick = function () {
+        const fromName = userPosition ? "내 위치" : "서울시청";
+        const fromLat = userPosition ? userPosition.getLat() : 37.5665;
+        const fromLon = userPosition ? userPosition.getLng() : 126.9780;
+        const toName = trash.t_road_addr || "쓰레기통";
+        const toLat = trash.t_lat;
+        const toLon = trash.t_lon;
+        const url = `https://map.kakao.com/link/from/${fromName},${fromLat},${fromLon}/to/${toName},${toLat},${toLon}`;
+        window.open(url, "_blank");
+      };
+
+      document.getElementById('trashDetailModal').style.display = 'block';
+    }
+
+    function closeModal() {
+      document.getElementById('trashDetailModal').style.display = 'none';
+    }
+
+    function makeTrashHtml(t, label) {
+      return `
+        <div class="bin-item" onclick="showTrashDetail(${JSON.stringify(t).replace(/"/g, '&quot;')})">
+          <div class="bin-left">
+            <img src="/static/img/marker_trash_yellow.png" alt="bin" class="bin-icon">
+            <div class="bin-info">
+              <strong>${label}</strong>
+            </div>
+          </div>
+          <div class="bin-distance">${t.distance.toFixed(0)}m</div>
+        </div>
+      `;
+    }
 
   const complaints = JSON.parse(document.getElementById('complaints-data').textContent);
 
@@ -288,6 +585,111 @@
   });
 
 </script>
+
+<style>
+  /* 모달 스타일 개선 */
+  #trashDetailModal {
+    position: fixed;
+    z-index: 1000;
+    left: 0; top: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
+  }
+
+  .modal-content {
+    background: #fff;
+    width: 90%;
+    max-width: 320px;   /* 최대 크기 제한 */
+    max-height: 80vh;   /* 화면 높이의 80%를 넘지 않도록 */
+    overflow-y: auto;   /* 내용 많으면 스크롤 */
+    border-radius: 10px;
+    font-family: sans-serif;
+    position: relative;
+    padding: 0;
+  }
+
+  .close {
+    position: absolute;
+    right: 10px;
+    top: 8px;
+    font-size: 22px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #444;
+  }
+
+  .trash-image img {
+    width: 100%;
+    height: 150px;        /* 이미지 높이 줄임 */
+    object-fit: cover;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+  }
+
+  .trash-info {
+    padding: 12px;
+  }
+
+  .trash-info h3 {
+    font-size: 15px;
+    margin-bottom: 8px;
+  }
+
+  .trash-type-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .trash-type img {
+    width: 25px;
+    height: 25px;
+  }
+
+  .type-name {
+    font-weight: bold;
+    font-size: 13px;
+  }
+
+  .type-loc {
+    font-size: 12px;
+    color: #666;
+  }
+
+  .modal-buttons {
+    display: flex;
+    border-top: 1px solid #ddd;
+  }
+
+  .modal-buttons button {
+    flex: 1;
+    padding: 10px 0;
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .btn-find { background: #f5f5f5; }
+  .btn-report { background: #1e90ff; color: white; }
+
+  #fixed-pin {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 30px;
+      height: 35px;
+      margin-left: -15px;  /* 중앙 보정 */
+      margin-top: -35px;   /* 핀 끝이 좌표 찍게 보정 */
+      background: url('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png') no-repeat center;
+      background-size: contain;
+      pointer-events: none; /* 드래그 방해 안 하도록 */
+      z-index: 9999;
+    }
+
+</style>
 {% endblock %}
 
 

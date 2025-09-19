@@ -35,6 +35,7 @@ class Complaints(Document):
     lon = FloatField(null=True)
     com_contents = StringField(max_length=255)
     com_reg_date = DateTimeField()
+    com_title = StringField()
 
     meta = {'collection': 'complaints'}
 

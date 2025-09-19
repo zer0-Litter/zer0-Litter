@@ -7,21 +7,48 @@
 {% endblock %}
 
 {% block content %}
-  <h1>zer0 Litter는 쓰레기 무단 투기 없는 거리를 지향해요💚</h1>
+  <h1 class="page-title">zer0 Litter는 쓰레기 무단 투기 없는 거리를 지향해요💚</h1>
 
   <!-- 카카오 지도 영역 -->
-  <div id="map" style="width:100%; height:500px;"></div>
+  <div id="map" style="width:100%; height:380px;"></div>
 
   <!-- 쓰레기통 상세 정보 모달 -->
   <div id="trashDetailModal" style="display:none;">
     <div class="modal-content">
       <span class="close" onclick="closeModal()">&times;</span>
-      <h2 id="trashName"></h2>
-      <p id="trashAddress"></p>
-      <p>종류: <span id="trashType"></span></p>
-      <p>설치 장소: <span id="trashLoc"></span></p>
-      <p>관리 기관: <span id="trashDept"></span></p>
-      <p>관리 연락처: <span id="trashContact"></span></p>
+
+      <!-- 쓰레기통 이미지 -->
+      <div class="trash-image">
+        <img id="trashImage" src="/static/img/default_bin.png" alt="쓰레기통 사진">
+      </div>
+
+      <!-- 주소 및 상세 정보 -->
+      <div class="trash-info">
+        <h3 id="trashAddressMain">주소 정보 없음</h3>
+
+        <div class="trash-type-wrap">
+          <div class="trash-type" id="type1">
+            <img src="/static/img/icon_trash.png" alt="">
+            <div>
+              <div class="type-name" id="type1-name">일반 쓰레기</div>
+              <div class="type-loc" id="type1-loc">위치: -</div>
+            </div>
+          </div>
+          <div class="trash-type" id="type2">
+            <img src="/static/img/icon_recycle.png" alt="">
+            <div>
+              <div class="type-name" id="type2-name">재활용</div>
+              <div class="type-loc" id="type2-loc">위치: -</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 버튼 -->
+      <div class="modal-buttons">
+        <button class="btn-find" id="btnFind">길찾기</button>
+        <button class="btn-report" id="btnReport">신고하기</button>
+      </div>
     </div>
   </div>
 
@@ -29,197 +56,382 @@
   <div id="recommendationList" style="margin-top: 20px;"></div>
 
   <script>
-    let map;
-    let markers = [];
-    let userPosition = null;
-    let trashList = [];
+  let map;
+  let markers = [];
+  let userPosition = null;
+  let trashList = [];
 
-    let grayMarkerImage;
-    let yellowMarkerImage;
+  let grayMarkerImage;
+  let yellowMarkerImage;
 
-    const districtId = "{{ district_id }}";
+  const districtId = "{{ district_id }}";
 
-    function computeDistanceByPolyline(pos1, pos2) {
-      if (!pos1 || !pos2) return Infinity;
-      const line = new kakao.maps.Polyline({ path: [pos1, pos2] });
-      return line.getLength();
-    }
+  function computeDistanceByPolyline(pos1, pos2) {
+    if (!pos1 || !pos2) return Infinity;
+    const line = new kakao.maps.Polyline({ path: [pos1, pos2] });
+    return line.getLength();
+  }
 
-    function initMap() {
-      map = new kakao.maps.Map(document.getElementById('map'), {
-        center: new kakao.maps.LatLng(37.5665, 126.9780),
-        level: 5
+  function initMap() {
+    map = new kakao.maps.Map(document.getElementById('map'), {
+      center: new kakao.maps.LatLng(37.5665, 126.9780),
+      level: 5
+    });
+
+    // 마커 이미지
+    grayMarkerImage = new kakao.maps.MarkerImage(
+      '/static/img/marker_trash_gray.png',
+      new kakao.maps.Size(32, 40)
+    );
+    yellowMarkerImage = new kakao.maps.MarkerImage(
+      '/static/img/marker_trash_yellow_outline_2px.png',
+      new kakao.maps.Size(32, 42)
+    );
+
+    // 위치 가져오기 (지도 중심 설정 및 내 위치 마커)
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(position => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        userPosition = new kakao.maps.LatLng(lat, lon);
+        map.setCenter(userPosition);
+
+        // 내 위치 마커
+        new kakao.maps.Marker({
+          map: map,
+          position: userPosition,
+          title: '내 위치',
+          image: new kakao.maps.MarkerImage(
+            'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',
+            new kakao.maps.Size(24, 35)
+          )
+        });
+
+        loadTrashcans(lat, lon);
+      }, () => {
+        alert('⚠️ 위치 정보를 가져오지 못했습니다. "서울시청"에서 출발로 설정합니다.');
+        const defaultLat = 37.5665, defaultLon = 126.9780;
+        userPosition = null;
+        map.setCenter(new kakao.maps.LatLng(defaultLat, defaultLon));
+        loadTrashcans(defaultLat, defaultLon);
       });
+    }
+  }
 
-      // Kakao Maps API가 완전히 로드된 후 MarkerImage 객체 생성
-      grayMarkerImage = new kakao.maps.MarkerImage(
-        '/static/img/marker_trash_gray.png',
-        new kakao.maps.Size(32, 40)
-      );
-      yellowMarkerImage = new kakao.maps.MarkerImage(
-        '/static/img/marker_trash_yellow.png',
-        new kakao.maps.Size(32, 40)
-      );
+  kakao.maps.load(initMap);
 
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(position => {
-          const lat = position.coords.latitude;
-          const lon = position.coords.longitude;
-          userPosition = new kakao.maps.LatLng(lat, lon);
-          map.setCenter(userPosition);
+  function loadTrashcans(lat, lon, radius = 10000000) {
+    fetch(`/trash_loc/list/${districtId}/?lat=${lat}&lon=${lon}&radius=${radius}`)
+      .then(res => res.json())
+      .then(data => {
+        markers.forEach(m => m.setMap(null));
+        markers = [];
+        trashList = [];
 
-          new kakao.maps.Marker({
+        data.forEach(trash => {
+          if (!trash.t_lat || !trash.t_lon) return;
+          const position = new kakao.maps.LatLng(trash.t_lat, trash.t_lon);
+          const distance = computeDistanceByPolyline(userPosition || new kakao.maps.LatLng(lat, lon), position);
+          if (!isFinite(distance)) return;
+          trashList.push({ ...trash, distance });
+        });
+
+        trashList.sort((a, b) => a.distance - b.distance);
+
+        const within100 = trashList.find(t => t.distance <= 100) || null;
+        const within300 = trashList.find(t => t.distance > 100 && t.distance <= 300) || null;
+        const within500 = trashList.find(t => t.distance > 300 && t.distance <= 500) || null;
+
+        const recommended = [within100, within300, within500].filter(Boolean);
+
+        trashList.forEach(trash => {
+          const isRecommended = recommended.some(r =>
+            r.t_lat.toFixed(6) === trash.t_lat.toFixed(6) &&
+            r.t_lon.toFixed(6) === trash.t_lon.toFixed(6)
+          );
+
+          const marker = new kakao.maps.Marker({
             map: map,
-            position: userPosition,
-            title: '내 위치',
-            image: new kakao.maps.MarkerImage(
-              'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',
-              new kakao.maps.Size(24, 35)
-            )
+            position: new kakao.maps.LatLng(trash.t_lat, trash.t_lon),
+            title: trash.t_road_addr,
+            image: isRecommended ? yellowMarkerImage : grayMarkerImage,
+            clickable: true
           });
 
-          loadTrashcans(lat, lon);
-        }, () => {
-          alert('위치 정보를 가져오지 못해 기본 위치(서울시청)로 설정합니다.');
-          const defaultLat = 37.5665, defaultLon = 126.9780;
-          userPosition = new kakao.maps.LatLng(defaultLat, defaultLon);
-          map.setCenter(userPosition);
-          loadTrashcans(defaultLat, defaultLon);
+          kakao.maps.event.addListener(marker, 'click', () => showTrashDetail(trash));
+          markers.push(marker);
         });
-      }
-    }
 
-    kakao.maps.load(initMap);
-
-    function loadTrashcans(lat, lon, radius = 500) {
-      fetch(`/trash_loc/list/${districtId}/?lat=${lat}&lon=${lon}&radius=${radius}`)
-        .then(res => res.json())
-        .then(data => {
-          // 기존 마커 제거
-          markers.forEach(m => m.setMap(null));
-          markers = [];
-          trashList = [];
-
-          data.forEach(trash => {
-            if (!trash.t_lat || !trash.t_lon) return;
-
-            const position = new kakao.maps.LatLng(trash.t_lat, trash.t_lon);
-            const distance = computeDistanceByPolyline(userPosition, position);
-            if (!isFinite(distance)) return;
-
-            // 기본 마커는 회색 이미지로 생성
-            const marker = new kakao.maps.Marker({
-              map: map,
-              position: position,
-              title: trash.t_road_addr,
-              image: grayMarkerImage,
-              clickable: true
-            });
-
-            kakao.maps.event.addListener(marker, 'click', () => showTrashDetail(trash));
-            markers.push(marker);
-            trashList.push({ ...trash, distance });
-          });
-
-          trashList.sort((a, b) => a.distance - b.distance);
-          displayRecommendationList(trashList);
-        })
-        .catch(err => {
-          console.error("쓰레기통 로드 실패:", err);
-          alert("쓰레기통 데이터를 불러오는 데 실패했습니다.");
-        });
-    }
-
-    function showTrashDetail(trash) {
-      document.getElementById('trashName').innerText = trash.t_road_addr || '주소 정보 없음';
-      document.getElementById('trashAddress').innerText = trash.t_detailed_addr || '';
-      document.getElementById('trashType').innerText = trash.t_trash_type || '알 수 없음';
-      document.getElementById('trashLoc').innerText = trash.t_loc || '알 수 없음';
-      document.getElementById('trashDept').innerText = trash.t_dept || '알 수 없음';
-      document.getElementById('trashContact').innerText = trash.t_contact || '없음';
-      document.getElementById('trashDetailModal').style.display = 'block';
-    }
-
-    function closeModal() {
-      document.getElementById('trashDetailModal').style.display = 'none';
-    }
-
-    function displayRecommendationList(trashes) {
-      const container = document.getElementById('recommendationList');
-
-      if (!trashes.length) {
-        container.innerHTML = '<p>추천할 수 있는 쓰레기통이 없습니다.</p>';
-        return;
-      }
-
-      // 거리 필터링: 100m, 300m, 500m 각각 1개씩
-      const within100 = trashes.filter(t => t.distance <= 100).sort((a, b) => a.distance - b.distance)[0];
-      const within300 = trashes.filter(t => t.distance > 100 && t.distance <= 300).sort((a, b) => a.distance - b.distance)[0];
-      const within500 = trashes.filter(t => t.distance > 300 && t.distance <= 500).sort((a, b) => a.distance - b.distance)[0];
-
-      const selected = [
-        within100 && { ...within100, range: '100m 이내' },
-        within300 && { ...within300, range: '300m 이내' },
-        within500 && { ...within500, range: '500m 이내' },
-      ].filter(Boolean);
-
-      if (!selected.length) {
-        container.innerHTML = '<p>추천할 수 있는 쓰레기통이 없습니다.</p>';
-        return;
-      }
-
-      // 모든 마커를 기본 회색으로 초기화
-      markers.forEach(m => m.setImage(grayMarkerImage));
-
-      // 추천 쓰레기통에 해당하는 마커만 노란색으로 변경
-      selected.forEach(trash => {
-        const marker = markers.find(m => {
-          const pos = m.getPosition();
-          return pos.getLat() === trash.t_lat && pos.getLng() === trash.t_lon;
-        });
-        if (marker) {
-          marker.setImage(yellowMarkerImage);
-        }
+        displayRecommendationList(within100, within300, within500);
+      })
+      .catch(err => {
+        console.error("쓰레기통 로드 실패:", err);
+        alert("쓰레기통 데이터를 불러오는 데 실패했습니다.");
       });
+  }
 
-      const html = selected.map(t => `
-        <div style="margin-bottom:10px; padding:10px; border:1px solid #ccc; border-radius:6px; display:flex; justify-content:space-between;">
-          <div>
-            <strong>${t.t_road_addr || '주소 없음'}</strong><br>
-            거리: ${t.distance.toFixed(1)}m<br>
-            종류: ${t.t_trash_type || '알 수 없음'}<br>
-            설치 장소: ${t.t_loc || '-'}
-          </div>
-          <div style="margin-left:10px; font-weight:bold; color:#0066cc; white-space:nowrap;">${t.range}</div>
-        </div>
-      `).join('');
+  function showTrashDetail(trash) {
+    // 타입 표준화
+    let type = trash.t_trash_type || "알 수 없음";
+    if (type === "가로쓰레기통") type = "일반쓰레기통";
+    if (type === "일반쓰레기") type = "일반쓰레기통";
+    if (type === "재활용쓰레기") type = "재활용";
 
-      container.innerHTML = `<h3>📌 추천 쓰레기통</h3>${html}`;
+    const trashImageMap = {
+      "재활용": "/static/img/recycle_bin.png",
+      "일반쓰레기통": "/static/img/street_bin.png",
+      "서리풀컵": "/static/img/seripoolcup.png"
+    };
+    const imageSrc = trash.t_image_url || trashImageMap[type] || "/static/images/trashcans/default.png";
+    document.getElementById('trashImage').src = imageSrc;
+
+    document.getElementById('trashAddressMain').innerText = trash.t_road_addr || '주소 정보 없음';
+
+    const type1El = document.getElementById('type1');
+    const type2El = document.getElementById('type2');
+
+    // 일반쓰레기 블록
+    if (type.includes("일반")) {
+      type1El.style.display = 'flex';
+      document.getElementById('type1-name').innerText = '일반쓰레기';
+      document.getElementById('type1-loc').innerText = trash.t_loc ? '위치: ' + trash.t_loc : '';
+    } else {
+      type1El.style.display = 'none';
     }
+
+    // 재활용 블록
+    if (type.includes("재활용")) {
+      type2El.style.display = 'flex';
+      document.getElementById('type2-name').innerText = '재활용';
+      document.getElementById('type2-loc').innerText = trash.t_recycle_loc ? '위치: ' + trash.t_recycle_loc : '';
+    } else {
+      type2El.style.display = 'none';
+    }
+
+    // 🔹 신고하기 버튼
+    document.getElementById('btnReport').onclick = function () {
+      if (!navigator.geolocation) {
+        alert("⚠️ 위치 정보를 가져올 수 없습니다. 주소를 직접 입력해주세요.");
+        window.location.href = `/complain_add/?address=${encodeURIComponent(trash.t_road_addr || "")}`;
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(position => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+
+        // 신고 페이지로 주소 + 위도/경도 전달
+        const url = `/complain_add/?address=${encodeURIComponent(trash.t_road_addr || "")}&lat=${lat}&lon=${lon}`;
+        window.location.href = url;
+
+      }, () => {
+        // 권한 거부 시 주소만 전달
+        const url = `/complain_add/?address=${encodeURIComponent(trash.t_road_addr || "")}`;
+        window.location.href = url;
+      });
+    };
+
+    // 길찾기 버튼
+    document.getElementById('btnFind').onclick = function () {
+      const fromName = userPosition ? "내 위치" : "서울시청";
+      const fromLat = userPosition ? userPosition.getLat() : 37.5665;
+      const fromLon = userPosition ? userPosition.getLng() : 126.9780;
+      const toName = trash.t_road_addr || "쓰레기통";
+      const toLat = trash.t_lat;
+      const toLon = trash.t_lon;
+      const url = `https://map.kakao.com/link/from/${fromName},${fromLat},${fromLon}/to/${toName},${toLat},${toLon}`;
+      window.open(url, "_blank");
+    };
+
+    document.getElementById('trashDetailModal').style.display = 'block';
+  }
+
+  function closeModal() {
+    document.getElementById('trashDetailModal').style.display = 'none';
+  }
+
+
+  /* 안전한 DOM 기반 추천 리스트 생성(기존 makeTrashHtml & displayRecommendationList 대체) */
+  function createBinItem(trashObj, label, isClosest = false) {
+    const item = document.createElement('div');
+    item.className = 'bin-item' + (isClosest ? ' closest' : '');
+    item.style.cursor = 'pointer';
+
+    // left (icon + info)
+    const left = document.createElement('div');
+    left.className = 'bin-left';
+
+    const img = document.createElement('img');
+    img.src = '/static/img/marker_trash_yellow.png';
+    img.alt = 'bin';
+    img.className = 'bin-icon';
+    left.appendChild(img);
+
+    const info = document.createElement('div');
+    info.className = 'bin-info';
+    const strong = document.createElement('strong');
+    strong.textContent = (label || '').replace(/^서울특별시\s*/, '');
+    info.appendChild(strong);
+    left.appendChild(info);
+
+    // distance badge
+    const distWrap = document.createElement('div');
+    distWrap.className = 'bin-distance';
+    const badge = document.createElement('span');
+    badge.className = 'distance-badge' + (isClosest ? ' highlight' : '');
+    const distText = (typeof trashObj.distance === 'number' && isFinite(trashObj.distance))
+      ? Math.round(trashObj.distance) + 'm'
+      : '-';
+    badge.textContent = distText;
+    distWrap.appendChild(badge);
+
+    item.appendChild(left);
+    item.appendChild(distWrap);
+
+    // 안전하게 객체를 DOM 노드에 직접 저장 (문자열화 불필요)
+    item.__trash = trashObj;
+
+    // 클릭 시 showTrashDetail에 객체 전달
+    item.addEventListener('click', function (ev) {
+      if (ev && ev.preventDefault) ev.preventDefault();
+      try {
+        showTrashDetail(this.__trash);
+      } catch (err) {
+        console.error('showTrashDetail 실행 실패:', err);
+      }
+    });
+
+    return item;
+  }
+
+  function displayRecommendationList(within100, within300, within500) {
+    const container = document.getElementById('recommendationList');
+    if (!container) return;
+
+    // 안전하게 기존 내용 제거
+    while (container.firstChild) container.removeChild(container.firstChild);
+
+    const header = document.createElement('h3');
+    header.style.marginBottom = '8px';
+    header.textContent = '📌 추천 쓰레기통';
+    container.appendChild(header);
+
+    if (within100) {
+      container.appendChild(createBinItem(within100, within100.t_road_addr || '이름 없음', true));
+    } else {
+      const p = document.createElement('p');
+      p.className = 'no-bin';
+      p.textContent = '100m 이내 없음';
+      container.appendChild(p);
+    }
+
+    if (within300) {
+      container.appendChild(createBinItem(within300, within300.t_road_addr || '이름 없음'));
+    }
+
+    if (within500) {
+      container.appendChild(createBinItem(within500, within500.t_road_addr || '이름 없음'));
+    }
+  }
+
   </script>
 
-  <style>
-    #trashDetailModal {
-      position: fixed;
-      z-index: 1000;
-      left: 0; top: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.5);
-    }
-    .modal-content {
-      background: #fff;
-      margin: 10% auto;
-      padding: 20px;
-      width: 400px;
-      border-radius: 5px;
-      position: relative;
-    }
-    .close {
-      position: absolute;
-      right: 15px;
-      top: 10px;
-      font-size: 24px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-  </style>
-{% endblock %}
+
+    <style>
+
+      .page-title {
+        font-size: 14px;  /* 글자 크기 */
+        text-align: center; /* 중앙 정렬 (옵션) */
+        margin-bottom: 20px; /* 아래 여백 */
+        font-weight: normal; /* 필요하면 두께 줄임 */
+      }
+
+
+      /* 추천 쓰레기통 리스트 */
+      .bin-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border: 1.5px solid #d0e8ff;
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        background-color: #fff;
+        cursor: pointer;
+        transition: background 0.2s, transform 0.1s;
+      }
+      .bin-item:hover { background-color: #f5fbff; transform: translateY(-1px); }
+      .bin-item.closest { border-color: #ffd54f; background-color: #fff8e1; } /* 가장 가까운 쓰레기통 강조 */
+      .bin-left { display: flex; align-items: center; gap: 8px; }
+      .bin-icon { width: 26px; height: 26px; }
+      .bin-info strong { font-size: 14px; line-height: 1.2; }
+      .bin-distance { font-size: 13px; }
+      .distance-badge {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 12px;
+        background: #e0e0e0;
+        font-weight: bold;
+        font-size: 12px;
+      }
+      .distance-badge.highlight {
+        background: #ffd54f;
+        color: #000;
+      }
+      .no-bin {
+        font-size: 13px;
+        color: #777;
+        margin-bottom: 6px;
+        text-align: center;
+      }
+
+      /* 모달 스타일 */
+      #trashDetailModal {
+        position: fixed;
+        z-index: 1000;
+        left: 0; top: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5);
+      }
+      .modal-content {
+        background: #fff;
+        margin: 5% auto;
+        padding: 0;
+        width: 350px;
+        border-radius: 10px;
+        overflow: hidden;
+        font-family: sans-serif;
+        position: relative;
+      }
+      .close {
+        position: absolute;
+        right: 15px;
+        top: 10px;
+        font-size: 24px;
+        font-weight: bold;
+        cursor: pointer;
+        color: #444;
+      }
+      .trash-image img {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+      }
+      .trash-info { padding: 15px; }
+      .trash-info h3 { font-size: 16px; margin-bottom: 10px; }
+      .trash-type-wrap { display: flex; flex-direction: column; gap: 10px; }
+      .trash-type { display: flex; align-items: center; gap: 10px; }
+      .trash-type img { width: 30px; height: 30px; }
+      .type-name { font-weight: bold; }
+      .type-loc { font-size: 13px; color: #666; }
+      .modal-buttons { display: flex; border-top: 1px solid #ddd; }
+      .modal-buttons button {
+        flex: 1;
+        padding: 12px 0;
+        border: none;
+        font-size: 15px;
+        cursor: pointer;
+      }
+      .btn-find { background: #f5f5f5; }
+      .btn-report { background: #1e90ff; color: white; }
+    </style>
+  {% endblock %}
