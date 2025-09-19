@@ -53,7 +53,7 @@ def complain_add(request):
         qs = Complaints.objects(username=username).order_by('-com_reg_date')[:10]
         all_complaints = []
         for c in qs:
-            type_display = ', '.join(c.com_type) if isinstance(c.com_type, list) else c.com_type
+            type_display = ', '.join([t.strip() for t in c.com_type]) if isinstance(c.com_type, list) else ', '.join([s.strip() for s in c.com_type.split(',')])
             all_complaints.append({
                 "com_id": c.com_id,
                 "com_type": type_display,
@@ -78,6 +78,10 @@ def complain_add(request):
     com_type = ', '.join(com_types)
     com_contents = (request.POST.get('com_contents') or '').strip()
     com_location = (request.POST.get('com_location') or '').strip()
+
+    # (옵션) 지역 기본 prefix
+    if com_location and not com_location.startswith("서울특별시"):
+        com_location = "서울특별시 " + com_location
 
     # 재민원 플래그/원본 com_id
     is_reuse = (request.POST.get('is_reuse') == 'Y')
