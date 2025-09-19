@@ -16,6 +16,7 @@ Including another URLconf
 """
 from django.urls import path
 from . import views  # 뷰가 있으면 import
+from complain import views as complain_views
 
 app_name = 'trash_loc'
 
@@ -25,5 +26,7 @@ urlpatterns = [
     path('trash_loc/list/<str:district_id>/', views.trash_bin_list, name='trash_bin_list'),  # 목록 조회
     # path('trash_bin/<int:bin_id>/detail/', views.trash_bin_detail, name='trash_bin_detail'),  # 상세 정보
     # path('complain/<int:bin_id>/', views.complain, name='complain'),  # 민원 페이지
+    path("save_location/", views.save_location, name="save_location"),
+    path('complain_add/', complain_views.complain_add, name='complain_add'),
 
 ]
