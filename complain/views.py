@@ -53,7 +53,12 @@ def complain_add(request):
         qs = Complaints.objects(username=username).order_by('-com_reg_date')[:10]
         all_complaints = []
         for c in qs:
-            type_display = ', '.join([t.strip() for t in c.com_type]) if isinstance(c.com_type, list) else ', '.join([s.strip() for s in c.com_type.split(',')])
+            # 타입 문자열 통일: 공백 제거 + 빈 값 제거
+            type_display = (
+                ', '.join([t.strip() for t in c.com_type if str(t).strip()])
+                if isinstance(c.com_type, list)
+                else ', '.join([s.strip() for s in str(c.com_type).split(',') if s.strip()])
+            )
             all_complaints.append({
                 "com_id": c.com_id,
                 "com_type": type_display,
@@ -71,6 +76,8 @@ def complain_add(request):
             'initial': {'lat': lat, 'lon': lon, 'address': address},
             'today_date': timezone.now().strftime('%Y-%m-%d'),
             'all_complaints': all_complaints,
+            'is_reuse': request.GET.get('is_reuse', 'N'),
+            'origin_com_id': request.GET.get('origin_com_id',''),
         })
 
     # POST 요청: 민원 저장

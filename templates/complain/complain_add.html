@@ -20,7 +20,7 @@
   {% csrf_token %}
 
   <div>
-    <label for="com_location"><strong>위치(테스트용)</strong></label>
+    <label for="com_location"><strong>위치</strong></label>
     {% if address %}
     <!-- 쓰레기통 모달에서 넘어온 경우 → 주소 자동 입력 + 수정 가능 -->
     <input type="text"
@@ -97,12 +97,31 @@
 
 
   <div>
-    <label><strong>신고 유형</strong></label>
-    <label><input type="checkbox" name="com_type" value="청소요청" {% if initial and '청소요청' in initial.types %}checked{% endif %} /> 청소요청</label>
-    <label><input type="checkbox" name="com_type" value="수리요청" {% if initial and '수리요청' in initial.types %}checked{% endif %} /> 수리요청</label>
-    <label><input type="checkbox" name="com_type" value="추가요청" {% if initial and '추가요청' in initial.types %}checked{% endif %} /> 추가요청</label>
-    <label><input type="checkbox" name="com_type" value="기타" {% if initial and '기타' in initial.types %}checked{% endif %}> 기타</label>
+    <label for="com_type"><strong>신고 유형</strong></label>
+
+    <!-- 실제 전송용 select (숨김) -->
+    <select id="com_type" name="com_type" multiple style="display:none;">
+      <option value="청소요청" {% if initial and '청소요청' in initial.types %}selected{% endif %}>청소가 필요해요</option>
+      <option value="수리요청" {% if initial and '수리요청' in initial.types %}selected{% endif %}>쓰레기통이 고장났어요</option>
+      <option value="추가요청" {% if initial and '추가요청' in initial.types %}selected{% endif %}>쓰레기통 설치해주세요</option>
+      <option value="기타"   {% if initial and '기타'   in initial.types %}selected{% endif %}>기타 (정책 제안, 무단투기 단속 등)</option>
+    </select>
+
+    <!-- 커스텀 멀티 드롭다운 -->
+    <div class="multi-dd" id="type-dd">
+      <button type="button" class="multi-dd__control" aria-haspopup="listbox" aria-expanded="false">
+        <span class="multi-dd__value">선택</span>
+        <span class="multi-dd__arrow">▾</span>
+      </button>
+      <div class="multi-dd__menu" role="listbox" aria-hidden="true">
+        <ul class="multi-dd__list" id="type-dd-list">
+          <!-- JS가 select 옵션을 기반으로 채움 -->
+        </ul>
+      </div>
+    </div>
   </div>
+
+
 
 
   <div>
@@ -428,12 +447,19 @@
 
 
   function applyComplaint(location, typeStr, contents, comId) {
-    document.getElementById('com_location').value = location;
+    const locInput =
+      document.getElementById('com_location') ||
+      document.getElementById('com_location_from_modal') ||
+      document.querySelector('input[name="com_location"]');
+    if (locInput) locInput.value = location;
 
     const types = String(typeStr || '').split(',').map(s => s.trim()).filter(Boolean);
-    document.querySelectorAll('input[name="com_type"]').forEach(el => {
-      el.checked = types.includes(el.value);
-    });
+    // 커스텀 드롭다운(select) 기준으로 선택 동기화
+    const selectEl = document.getElementById('com_type');
+    Array.from(selectEl.options).forEach(o => { o.selected = types.includes(o.value); });
+    // 위젯 텍스트 갱신 (이미 있는 함수들 호출)
+    if (typeof renderList === 'function') renderList();
+    if (typeof refreshValue === 'function') refreshValue();
 
     document.getElementById('com_contents').value = contents || '';
 
@@ -444,11 +470,16 @@
     hideModal();
   }
 
-   function validateForm() {
-    const location = document.getElementById('com_location').value.trim();
-    const checkedTypes = document.querySelectorAll('input[name="com_type"]:checked');
+  function validateForm() {
+    const locInput =
+        document.getElementById('com_location') ||
+        document.getElementById('com_location_from_modal') ||
+        document.querySelector('input[name="com_location"]');
+    const location = (locInput?.value || '').trim();
+    const selectEl = document.getElementById('com_type');
+    const selectedOptions = Array.from(selectEl.selectedOptions).map(o => o.value);
 
-    if (!location || checkedTypes.length === 0) {
+    if (!location || selectedOptions.length === 0) {
       showModal("위치와 신고유형은 필수 입력입니다.");
       return false;  // 제출 막기
     }
@@ -555,19 +586,26 @@
 
   const formEl = document.getElementById('complain-form');
 
-  // 완전 수동 초기화 (기본값도 빈 값으로 교체)
   document.getElementById('btn-reset').addEventListener('click', () => {
-    // 1) 텍스트/텍스트에어리어
-    const loc = document.getElementById('com_location');
+    // 1) 위치 입력 (상황별 id 대응)
+    const locInput =
+      document.getElementById('com_location') ||
+      document.getElementById('com_location_from_modal') ||
+      document.querySelector('input[name="com_location"]');
+    if (locInput && !locInput.readOnly) {
+      locInput.value = '';
+      locInput.defaultValue = '';
+    }
+    // 상세 내용
     const cont = document.getElementById('com_contents');
-    loc.value = '';          loc.defaultValue = '';      // reset 기준도 빈값으로
-    cont.value = '';         cont.defaultValue = '';
+    if (cont) { cont.value = ''; cont.defaultValue = ''; }
 
-    // 2) 체크박스 전부 해제
-    document.querySelectorAll('input[name="com_type"]').forEach(el => {
-      el.checked = false;
-      el.defaultChecked = false;   // reset 기준도 해제 상태로
-    });
+    // 2) 신고유형: select 옵션 모두 해제 + 드롭다운 UI 갱신
+    const selectEl = document.getElementById('com_type');
+    Array.from(selectEl.options).forEach(o => { o.selected = false; });
+    // 아래 함수들은 위젯 IIFE 안에 정의되어 있음 → 전역에서 호출 가능하도록 보장됨
+    if (typeof renderList === 'function') renderList();
+    if (typeof refreshValue === 'function') refreshValue();
 
     // 3) 사진 입력들 제거/초기화
     document.getElementById('photo-list').innerHTML = '';
@@ -581,8 +619,82 @@
     origin.value = '';       origin.defaultValue = '';
 
     // 5) 포커스 UX
-    loc.focus();
+    if (locInput && !locInput.readOnly) locInput.focus();
   });
+
+  // ===== 멀티 드롭다운 위젯 =====
+(function () {
+  const selectEl = document.getElementById('com_type');         // 숨겨진 select
+  const dd = document.getElementById('type-dd');
+  const ctrl = dd.querySelector('.multi-dd__control');
+  const valueSpan = dd.querySelector('.multi-dd__value');
+  const menu = dd.querySelector('.multi-dd__menu');
+  const list = dd.querySelector('#type-dd-list');
+
+  // 옵션 -> 리스트 아이템 렌더
+  function renderList() {
+    const opts = Array.from(selectEl.options);
+    list.innerHTML = '';
+    opts.forEach((opt, idx) => {
+      const li = document.createElement('li');
+      li.className = 'multi-dd__item';
+      li.dataset.value = opt.value;
+
+      li.innerHTML = `
+        <label class="multi-dd__option">
+          <input type="checkbox" ${opt.selected ? 'checked' : ''} />
+          <span>${opt.text}</span>
+        </label>
+      `;
+      li.querySelector('input').addEventListener('change', (e) => {
+        opt.selected = e.target.checked;     // select와 동기화
+        refreshValue();
+      });
+      list.appendChild(li);
+    });
+  }
+
+  function refreshValue() {
+    const selected = Array.from(selectEl.selectedOptions).map(o => o.text);
+    valueSpan.textContent = selected.length ? selected.join(', ') : '유형을 선택해주세요';
+  }
+
+  // 초기 렌더
+  renderList();
+  refreshValue();
+
+  // 열고 닫기
+  function openMenu() {
+    menu.setAttribute('aria-hidden', 'false');
+    ctrl.setAttribute('aria-expanded', 'true');
+    renderList();
+  }
+  function closeMenu() {
+    menu.setAttribute('aria-hidden', 'true');
+    ctrl.setAttribute('aria-expanded', 'false');
+  }
+  ctrl.addEventListener('click', (e) => {
+    const isOpen = ctrl.getAttribute('aria-expanded') === 'true';
+    isOpen ? closeMenu() : openMenu();
+  });
+  document.addEventListener('click', (e) => {
+    if (!dd.contains(e.target)) closeMenu();
+  });
+
+
+  // 이전 민원 적용 시(이미 있는 로직) select 동기화도 필요
+  window.applyComplaint = (function (orig) {
+    return function (location, typeStr, contents, comId) {
+      // 원래 함수 호출 전에 select 동기화만 살짝 보강
+      const types = String(typeStr || '').split(',').map(s => s.trim()).filter(Boolean);
+      Array.from(selectEl.options).forEach(o => { o.selected = types.includes(o.value); });
+      renderList();
+      refreshValue();
+      return orig(location, typeStr, contents, comId);
+    };
+  })(window.applyComplaint);
+})();
+
 
 </script>
 
@@ -688,6 +800,26 @@
       pointer-events: none; /* 드래그 방해 안 하도록 */
       z-index: 9999;
     }
+
+.multi-dd { position: relative; max-width: 100%; }
+.multi-dd__control {
+  width: 100%; height: 40px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 12px; border: 1px solid #d0d0d0; border-radius: 8px; background: #fff; cursor: pointer;
+}
+.multi-dd__value { color: #333; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.multi-dd__arrow { margin-left: 8px; }
+
+.multi-dd__menu {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: #fff;
+  border: 1px solid #ddd; border-radius: 10px; box-shadow: 0 6px 18px rgba(0,0,0,.08);
+  padding: 8px; max-height: 260px; overflow: hidden; display: block;
+}
+.multi-dd__menu[aria-hidden="true"] { display: none; }
+
+.multi-dd__list { list-style: none; padding: 0; margin: 0; max-height: 190px; overflow: auto; }
+.multi-dd__item { padding: 6px; }
+.multi-dd__option { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.multi-dd__option input { width: 16px; height: 16px; }
 
 </style>
 {% endblock %}
