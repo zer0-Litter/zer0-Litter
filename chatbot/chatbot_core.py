@@ -63,6 +63,7 @@ _complaint_chain_prompt = ChatPromptTemplate.from_messages([
         "당신은 친절하지만 정확한 민원 접수 챗봇입니다. 사용자의 불편함에 공감하면서도 빠르게 민원을 제보할 수 있게 질문하며 대화하세요."
         "단계별로 추론해서 답변해"
         "사용자의 민원을 '청소요청', '수리요청', '추가요청', '기타민원' 중 하나 또는 여러 개로 분류하세요. "
+        "청소요청, 수리요청, 추가요청, 기타민원 중에 어떤 건지 넣어줘. 중복도 가능해. 청소요청은 쓰레기통이나 쓰레기통이 없어도 가능한 요청이고, 수리요청 추가요청은 쓰레기통에 대한 내용들이야. 그 이외에는 기타민원으로 넣으면 돼 "
         "만약 사용자가 '쓰레기통'과 관련된 민원을 제기하면, '청소요청' 또는 '수리요청'으로 분류하세요."
         "만약 여러 개의 유형이라면 쉼표(,)로 구분하세요. (예: 청소요청,수리요청)"
         "만약 분류가 명확하지 않다면, 공감하며 자연스러운 질문을 생성하여 추가 정보를 요청하세요."
@@ -95,7 +96,7 @@ def preprocess_text(text):
     # 사용자가 언급한 조사들을 포함하여 더 포괄적인 불용어 목록을 정의합니다.
     stopwords = [
         '은', '는', '이', '가', '을', '를', '의', '에', '에서', '에게', '로', '으로',
-        '와', '과', '고', '에게', '한테', '처럼', '만큼',
+        '와', '과', '고', '에게', '한테', '처럼', '만큼', '다', '뭐',
         '것', '곳', '다', '등', '내', '저', '수', '점', '말', '그', '때', '후', '때문'
     ]
     processed_text = ' '.join([word for word in nouns if word not in stopwords])
@@ -189,10 +190,18 @@ def handle_complain_submit(user_input, username, session_id, chat_history):
     is_final = len(com_types) > 0
 
     if is_final:
-        # 전처리된 텍스트를 벡터화하여 ChromaDB에만 저장
         try:
             preprocessed_text = preprocess_text(user_input)
-            vector_store.add_texts(texts=[preprocessed_text])
+
+            # 여기서 com_type을 단일 문자열로 변환합니다.
+            com_type_string = ','.join(com_types)
+
+            # 벡터와 함께 메타데이터를 저장하도록 수정합니다.
+            if preprocessed_text:
+                vector_store.add_texts(
+                    texts=[preprocessed_text],
+                    metadatas=[{"com_type": com_type_string}]
+                )
         except Exception as e:
             logger.error(f"ChromaDB에 민원 벡터화 실패: {e}", exc_info=True)
 
@@ -202,7 +211,6 @@ def handle_complain_submit(user_input, username, session_id, chat_history):
         response = llm_output
 
     return {"response": response, "com_type": com_types, "is_final": is_final}
-
 
 def handle_trash_finder(user_input, username, session_id):
     """쓰레기통 위치 안내 시나리오를 처리하고 라우터에 결과를 반환합니다."""

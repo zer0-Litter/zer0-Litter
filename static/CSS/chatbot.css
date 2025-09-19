@@ -1,24 +1,39 @@
 /* chatbot.css */
 
+/* chatbot.css 파일 */
 .chatbot-container {
   font-family: 'Pretendard Variable', sans-serif;
-  display: flex; /* 내부 요소들을 flexbox로 관리 */
-  flex-direction: column; /* 세로 방향으로 정렬 */
+  display: flex;
+  flex-direction: column;
   max-width: 480px;
   margin: 0 auto;
-  padding: 0.1rem;
+  padding: 0.2rem;
   box-sizing: border-box;
-  height: 100vh;
   border: 0.5px solid #ddd;
-  border-radius: 10px;
+  border-radius: 15px;
   background-color: #f9f9f9;
+  height: 670px; /* 고정된 높이 유지 */
+  overflow: hidden; /* 컨테이너 스크롤 방지 */
 }
 
 .chatbot-main {
   display: flex;
   flex-direction: column;
+  flex-grow: 1;
+  /* height: 670px; 여기서 높이를 670px로 설정하는 대신 flex-grow: 1;로 남은 공간을 채우도록 변경 */
+  overflow: hidden; /* 여기도 스크롤 방지 */
+}
+
+.chat-window {
   flex-grow: 1; /* 남은 공간을 모두 차지하도록 설정 */
-  height: 100%;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  padding: 0.5rem;
+  overflow-y: auto; /* 이 부분만 스크롤되도록 설정 */
+  background-color: #fff;
+  margin-bottom: 1rem;
+  scroll-behavior: smooth;
+  font-family: 'Pretendard Variable', sans-serif;
 }
 
 /* 시나리오 버튼 고정 섹션 스타일 추가 */
@@ -77,7 +92,7 @@
   background-color: #f1f8e9;
   padding: 0.6rem 1rem;
   border-radius: 20px;
-  max-width: 70%;
+  max-width: 60%;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -112,7 +127,7 @@
 
 .chat-input input[type="text"] {
   flex-grow: 1;
-  padding: 0.6rem;
+  padding: 0.5rem;
   border: 1px solid #ccc;
   border-radius: 20px;
   font-size: 1rem;
