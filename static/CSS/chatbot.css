@@ -1,35 +1,55 @@
-/* chatbot.css */
-
 /* chatbot.css 파일 */
+
+/* 챗봇 페이지에서만 body 태그의 스타일을 재정의하여 스크롤을 막고 중앙 정렬을 설정합니다. */
+.chatbot-page {
+  /* common.css의 Flexbox를 덮어씁니다. */
+  display: flex; /* Flexbox를 사용해 챗봇 컨테이너를 중앙에 정렬 */
+  justify-content: center; /* 수평 중앙 정렬 */
+  align-items: center;     /* 수직 중앙 정렬 */
+  height: 100vh;
+  overflow: hidden;
+}
+
+
+/* 챗봇 페이지의 main 태그 스크롤을 막습니다. */
+.chatbot-page main {
+  overflow: hidden;
+}
+
+/* 챗봇 컨테이너를 화면 중앙에 고정합니다. */
 .chatbot-container {
   font-family: 'Pretendard Variable', sans-serif;
   display: flex;
   flex-direction: column;
-  max-width: 480px;
-  margin: 0 auto;
+  max-width: 500px;
+  /* margin: 0 auto; 와 position: absolute 를 제거합니다. */
   padding: 0.2rem;
   box-sizing: border-box;
   border: 0.5px solid #ddd;
   border-radius: 15px;
   background-color: #f9f9f9;
-  height: 670px; /* 고정된 높이 유지 */
-  overflow: hidden; /* 컨테이너 스크롤 방지 */
+  height: 670px;
+  overflow: hidden;
+
+  /*position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);*/
 }
 
 .chatbot-main {
   display: flex;
   flex-direction: column;
   flex-grow: 1;
-  /* height: 670px; 여기서 높이를 670px로 설정하는 대신 flex-grow: 1;로 남은 공간을 채우도록 변경 */
-  overflow: hidden; /* 여기도 스크롤 방지 */
+  overflow: hidden;
 }
 
 .chat-window {
-  flex-grow: 1; /* 남은 공간을 모두 차지하도록 설정 */
+  flex-grow: 1;
   border: 1px solid #ccc;
   border-radius: 10px;
   padding: 0.5rem;
-  overflow-y: auto; /* 이 부분만 스크롤되도록 설정 */
+  overflow-y: auto;
   background-color: #fff;
   margin-bottom: 1rem;
   scroll-behavior: smooth;
@@ -44,7 +64,7 @@
   margin-bottom: 1rem;
   gap: 0.5rem;
   font-family: 'Pretendard Variable', sans-serif;
-  flex-shrink: 0; /* 크기가 줄어들지 않도록 고정 */
+  flex-shrink: 0;
 }
 
 .scenario-btn {
@@ -61,18 +81,6 @@
 
 .scenario-btn:hover {
   background-color: #c8e6c9;
-}
-
-.chat-window {
-  flex-grow: 1; /* 남은 공간을 모두 차지하도록 설정 */
-  border: 1px solid #ccc;
-  border-radius: 10px;
-  padding: 0.5rem;
-  overflow-y: auto; /* 이 부분만 스크롤되도록 설정 */
-  background-color: #fff;
-  margin-bottom: 1rem;
-  scroll-behavior: smooth;
-  font-family: 'Pretendard Variable', sans-serif;
 }
 
 .chat-message {
@@ -122,7 +130,7 @@
   gap: 0.5rem;
   padding: 0.5rem 0;
   border-top: 1px solid #ccc;
-  flex-shrink: 0; /* 크기가 줄어들지 않도록 설정 */
+  flex-shrink: 0;
 }
 
 .chat-input input[type="text"] {
