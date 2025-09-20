@@ -19,7 +19,7 @@
   transform: translateX(-50%);
   width: 375px;
   height: 56px;
-  background-color: #e8f5e9;
+  background-color: #e3eff4;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -108,7 +108,7 @@ main {
   transform: translateX(-50%);
   width: 375px;
   height: 56px;
-  background-color: #f8fefc;
+  background-color: #e3eff4;
   border-top: 1px solid #ddd;
   display: flex;
   justify-content: space-around;
@@ -147,16 +147,27 @@ main {
   font-weight: bold;
 }
 
+/* 중앙 아이템의 기본 스타일 */
+.central-item .nav-icon {
+    color: white;
+}
 .central-item {
-  background-color: #4caf4f;
+  background-color: #142c47;
+  color: white; /* 텍스트 색상 기본값 */
   border-radius: 99px;
   padding: 0.3rem;
   box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
 }
 
-.central-item .nav-icon {
-  color: white;
-  transition: color 0.3s ease;
+/* 중앙 아이템에 마우스를 올렸을 때 배경색만 변경 */
+.central-item:hover {
+  background-color: #388e3c;
+}
+
+/* 중앙 아이템 내부에 있는 텍스트(span)와 아이콘의 색상을 hover 상태에서도 흰색으로 유지 */
+.central-item:hover .nav-icon,
+.central-item:hover span {
+  color: white; /* 텍스트와 아이콘 색상을 흰색으로 고정 */
 }
 
 /* 공통 모달 */
