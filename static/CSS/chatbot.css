@@ -209,6 +209,7 @@ html, body {
     background-color: #388e3c;
 }
 
+
 /* SVG 아이콘 스타일 */
 .chat-input button[type="submit"] svg {
     width: 1.5rem;
