@@ -24,7 +24,7 @@ html, body {
   flex-direction: column;
   max-width: 520px;
   width: 100%;
-  height: 100%;
+  height: calc(100% - 4rem); /* 하단 네비게이션바의 높이를 4rem으로 가정하고 높이를 동적으로 계산 */
   border: none;
   border-radius: 0;
   background-color: transparent;
@@ -146,7 +146,12 @@ html, body {
 
 /* chat-input: 인풋창의 선을 제거하고 크기를 조절합니다. */
 .chat-input {
-  position: relative;
+  position: fixed; /* 하단에 고정 */
+  bottom: 4rem; /* 하단 네비게이션바의 높이만큼 띄워줍니다. */
+  width: 100%;
+  max-width: 520px; /* 챗봇 컨테이너와 동일한 최대 너비 설정 */
+  z-index: 10;
+
   display: block;
   padding: 1.2rem;
   flex-shrink: 0;
@@ -155,7 +160,9 @@ html, body {
   border-radius: 30px;
   border: 1px solid #ccc;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  margin: 0.5rem 0.5rem 0 0.5rem; /* 위와 양 옆만 여백을 주고, 아래 여백은 0으로 설정합니다. */
+  margin-bottom: 0;
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
 }
 
 /* 텍스트 입력 영역 */
@@ -208,7 +215,6 @@ html, body {
 .chat-input button[type="submit"]:hover {
     background-color: #388e3c;
 }
-
 
 /* SVG 아이콘 스타일 */
 .chat-input button[type="submit"] svg {
