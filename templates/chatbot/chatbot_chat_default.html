@@ -10,32 +10,35 @@
 
 {% block content %}
 <div class="chatbot-container">
-    <div class="scenario-buttons-fixed">
-      <button class="scenario-btn" onclick="startScenario('trash_finder')">🗑️ 쓰레기통 찾기</button>
-      <button class="scenario-btn" onclick="startScenario('complain_submit')">📝 민원 제보하기</button>
+    <div class="chat-header-container">
+      <div class="initial-greeting">
+        <span>안녕하세요, AI 오엘입니다!</span> <br>
+        <span>도움이 필요한 버튼을 눌러주세요.</span>
+      </div>
+      <div class="scenario-buttons-fixed">
+        <button class="scenario-btn" onclick="startScenario('trash_finder')">🗑️ 쓰레기통 찾기</button>
+        <button class="scenario-btn" onclick="startScenario('complain_submit')">📝 민원 제보하기</button>
+      </div>
     </div>
 
     <div class="chatbot-main">
         <div class="chat-window" id="chatWindow">
-            <div class="chat-message assistant">
-                <div class="message-bubble">
-                    <span class="icon">🤖</span>
-                    <span class="text">
-                        안녕하세요, <strong>AI 오엘</strong>입니다!<br>
-                        원하는 버튼을 선택해 주세요 😊
-                    </span>
-                </div>
-            </div>
             </div>
 
-        <form class="chat-input" id="chatForm">
+        <form class="chat-input" id="chatForm" onsubmit="return handleFormSubmit(event)">
             {% csrf_token %}
-            <input type="text" id="messageInput" placeholder="메시지를 입력하세요..." autocomplete="off" />
+            <textarea id="messageInput" placeholder="메시지를 입력하세요..." autocomplete="off" rows="1"></textarea>
             <input type="hidden" id="latitudeInput" name="latitude">
             <input type="hidden" id="longitudeInput" name="longitude">
-            <label for="fileUpload" class="file-label">📷</label>
-            <input type="file" id="fileUpload" name="file" accept="image/*" capture="environment" style="display:none;" onchange="uploadFile()">
-            <button type="submit">전송</button>
+            <div class="input-buttons">
+                <label for="fileUpload" class="file-label">➕</label>
+                <input type="file" id="fileUpload" name="file" accept="image/*" capture="environment" style="display:none;" onchange="uploadFile()">
+                <button type="submit">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+                    </svg>
+                </button>
+            </div>
         </form>
     </div>
 </div>
@@ -66,6 +69,12 @@ let current_scenario = null;
 function startScenario(scenarioId) {
   current_scenario = scenarioId;
   let messages = [];
+
+  const initialAssistantMessage = document.querySelector('.initial-hidden');
+  if (initialAssistantMessage) {
+      initialAssistantMessage.style.display = 'flex';
+      initialAssistantMessage.classList.remove('initial-hidden');
+  }
 
   if (scenarioId === 'trash_finder') {
     messages = [
@@ -137,17 +146,14 @@ function uploadFile() {
   const file = fileInput.files[0];
   if (!file) return;
 
-  // 미리보기 표시
   appendMessage('user', null, URL.createObjectURL(file));
 
-  // FormData 생성
   const data = new FormData();
   data.append('file', file);
   data.append('message', '');
   data.append('session_id', session_id || '');
   data.append('scenario_id', current_scenario || 'complain_submit');
 
-  // 위치 정보 포함
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       pos => {
@@ -161,12 +167,11 @@ function uploadFile() {
     doFetch(data);
   }
 
-  fileInput.value = ''; // 파일 선택 초기화
+  fileInput.value = '';
 }
 
-// ---------------- 텍스트 메시지 전송 ----------------
-document.getElementById('chatForm').addEventListener('submit', function(e) {
-  e.preventDefault();
+// ---------------- 텍스트 메시지 전송 로직 통합 ----------------
+function sendTextMessage() {
   const input = document.getElementById('messageInput');
   const messageText = input.value.trim();
   if (!messageText) return;
@@ -192,6 +197,22 @@ document.getElementById('chatForm').addEventListener('submit', function(e) {
   }
 
   input.value = '';
+}
+
+// ---------------- 폼 제출 이벤트 핸들러 ----------------
+function handleFormSubmit(e) {
+  e.preventDefault(); // 폼의 기본 제출 동작을 막습니다.
+  sendTextMessage();
+  return false;
+}
+
+// ---------------- 엔터키 이벤트 핸들러 수정 ----------------
+document.getElementById('messageInput').addEventListener('keydown', function(event) {
+    // 엔터키(keyCode 13)가 눌렸고, Shift 키가 함께 눌리지 않았을 때
+    if (event.keyCode === 13 && !event.shiftKey) {
+        event.preventDefault(); // 기본 동작(줄바꿈)을 막습니다.
+        sendTextMessage();
+    }
 });
 </script>
 {% endblock %}
