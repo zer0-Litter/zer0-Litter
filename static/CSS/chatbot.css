@@ -1,40 +1,49 @@
-/* chatbot.css 파일 */
+/* Ensure HTML and Body take up the full viewport height */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* This is the key to preventing full page scroll */
+}
 
 /* 챗봇 페이지에서만 body 태그의 스타일을 재정의하여 스크롤을 막고 중앙 정렬을 설정합니다. */
 .chatbot-page {
-  /* common.css의 Flexbox를 덮어씁니다. */
-  display: flex; /* Flexbox를 사용해 챗봇 컨테이너를 중앙에 정렬 */
-  justify-content: center; /* 수평 중앙 정렬 */
-  align-items: center;     /* 수직 중앙 정렬 */
-  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
   overflow: hidden;
+  background-color: #f9f9f9;
 }
 
-
-/* 챗봇 페이지의 main 태그 스크롤을 막습니다. */
-.chatbot-page main {
-  overflow: hidden;
-}
-
-/* 챗봇 컨테이너를 화면 중앙에 고정합니다. */
+/* 챗봇 컨테이너를 화면 중앙에 고정하고, 테두리/배경을 제거합니다. */
 .chatbot-container {
   font-family: 'Pretendard Variable', sans-serif;
   display: flex;
   flex-direction: column;
   max-width: 520px;
-  /* margin: 0 auto; 와 position: absolute 를 제거합니다. */
-  padding: 0.4rem;
-  box-sizing: border-box;
-  border: 0.5px solid #ddd;
-  border-radius: 15px;
-  background-color: #f9f9f9;
-  height: 670px;
-  overflow: hidden;
+  width: 100%;
+  height: calc(100% - 4rem); /* 하단 네비게이션바의 높이를 4rem으로 가정하고 높이를 동적으로 계산 */
+  border: none;
+  border-radius: 0;
+  background-color: transparent;
+  padding: 0;
+  box-shadow: none;
+  margin: 0 auto;
+}
 
-  /*position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);*/
+/* 상단 헤더 컨테이너 */
+.chat-header-container {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 0.5rem;
+  box-sizing: border-box;
+  margin-top: 1rem;
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
 }
 
 .chatbot-main {
@@ -44,24 +53,35 @@
   overflow: hidden;
 }
 
+/* chat-window: 대화 내용만 스크롤되도록 설정 */
 .chat-window {
   flex-grow: 1;
-  border: 1px solid #ccc;
-  border-radius: 10px;
+  border: none;
+  border-radius: 0;
   padding: 0.5rem;
   overflow-y: auto;
-  background-color: #fff;
-  margin-bottom: 1rem;
+  background-color: transparent;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
   scroll-behavior: smooth;
   font-family: 'Pretendard Variable', sans-serif;
 }
 
-/* 시나리오 버튼 고정 섹션 스타일 추가 */
+/* 초기 인사말 스타일 */
+.initial-greeting {
+  text-align: center;
+  margin-top: 0;
+  margin-bottom: 0.8rem;
+  font-size: 1.2rem;
+  color: #555;
+  font-weight: bold;
+}
+
+/* 시나리오 버튼 고정 섹션 스타일 */
 .scenario-buttons-fixed {
   display: flex;
   justify-content: space-around;
-  margin-top: 1rem;
-  margin-bottom: 1rem;
+  margin-top: 0;
   gap: 0.5rem;
   font-family: 'Pretendard Variable', sans-serif;
   flex-shrink: 0;
@@ -124,44 +144,82 @@
   justify-content: center;
 }
 
+/* chat-input: 인풋창의 선을 제거하고 크기를 조절합니다. */
 .chat-input {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0;
-  border-top: 1px solid #ccc;
+  position: fixed; /* 하단에 고정 */
+  bottom: 4rem; /* 하단 네비게이션바의 높이만큼 띄워줍니다. */
+  width: 100%;
+  max-width: 520px; /* 챗봇 컨테이너와 동일한 최대 너비 설정 */
+  z-index: 10;
+
+  display: block;
+  padding: 1.2rem;
   flex-shrink: 0;
-}
-
-.chat-input input[type="text"] {
-  flex-grow: 1;
-  padding: 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 20px;
-  font-size: 1rem;
-}
-
-.chat-input button {
-  padding: 0.6rem 1rem;
-  background-color: #142c47;
-  color: white;
-  border: none;
+  box-sizing: border-box;
+  background-color: white;
   border-radius: 30px;
-  cursor: pointer;
+  border: 1px solid #ccc;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  margin-bottom: 0;
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
 }
 
-.chat-input button:hover {
-  background-color: #388e3c;
+/* 텍스트 입력 영역 */
+.chat-input textarea {
+  width: 100%;
+  min-height: 150px;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 1rem 1rem 3rem 1rem;
+  font-size: 1rem;
+  resize: none;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
+/* 버튼들을 감싸는 컨테이너 */
+.chat-input .input-buttons {
+    position: absolute;
+    bottom: 1rem;
+    right: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* 파일 업로드 버튼 ( + ) */
 .file-label {
-  font-size: 1.4rem;
-  cursor: pointer;
-  padding: 0 0.4rem;
-  color: #555;
-  transition: color 0.2s;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #555;
 }
 
-.file-label:hover {
-  color: #222;
+/* 전송 버튼 (SVG 포함) */
+.chat-input button[type="submit"] {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: none;
+    border-radius: 50%;
+    background-color: #142c47;
+    color: white;
+    width: 2.5rem;
+    height: 2.5rem;
+    cursor: pointer;
+    padding: 0;
 }
+
+/* Hover 효과 수정 */
+.chat-input button[type="submit"]:hover {
+    background-color: #388e3c;
+}
+
+/* SVG 아이콘 스타일 */
+.chat-input button[type="submit"] svg {
+    width: 1.5rem;
+    height: 1.5rem;
+    stroke: white;
+}
+# 커밋
