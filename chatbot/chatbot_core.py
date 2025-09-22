@@ -47,7 +47,8 @@ if CHROMA_DB_HOST:
 
 vector_store = Chroma(
     collection_name="complaint_embeddings",
-    embedding_function=embeddings,
+    embedding_function=OpenAIEmbeddings(api_key=settings.OPENAI_API_KEY),
+    persist_directory="./chroma_db",
     client=chroma_client
 )
 
@@ -85,6 +86,15 @@ _complaint_chain_prompt = ChatPromptTemplate.from_messages([
 ])
 complaint_chain = _complaint_chain_prompt | llm | StrOutputParser()
 
+# 💡 대화 내용을 요약하는 새로운 프롬프트
+_summary_prompt = ChatPromptTemplate.from_messages([
+    SystemMessagePromptTemplate.from_template(
+        "당신은 민원 내용을 정확하게 요약하는 전문 요약가입니다. 다음 대화 내용을 민원 담당자가 이해하기 쉽게 하나의 간결한 문장으로 요약해 주세요. 불필요한 인사말이나 확인 문구(예: '네', '맞아')는 제거하고, 핵심적인 민원 내용과 상황만을 포함해야 합니다. 사용자의 발화만 요약에 포함하세요."
+    ),
+    MessagesPlaceholder(variable_name="chat_history")
+])
+summary_chain = _summary_prompt | llm | StrOutputParser()
+
 
 # --- 전처리 함수 ---
 def preprocess_text(text):
@@ -105,7 +115,8 @@ def preprocess_text(text):
     # 사용자가 언급한 조사들을 포함하여 더 포괄적인 불용어 목록을 정의합니다.
     stopwords = [
         '은', '는', '이', '가', '을', '를', '의', '에', '에서', '에게', '로', '으로',
-        '와', '과', '고', '에게', '한테', '처럼', '만큼', '다', '뭐',
+        '와', '과', '고', '에게', '한테', '처럼', '만큼', '다', '뭐', '에는', '만',
+        '되', '해',
         '것', '곳', '다', '등', '내', '저', '수', '점', '말', '그', '때', '후', '때문'
     ]
     processed_text = ' '.join([word for word in nouns if word not in stopwords])
@@ -151,6 +162,17 @@ def get_langchain_history(chat_history):
             chat in chat_history]
 
 
+def get_com_types_from_history(chat_history):
+    """채팅 기록에서 봇이 추론했던 모든 민원 유형을 추출합니다."""
+    all_types = set()
+    for chat in chat_history:
+        if chat.get('scenario_id') == 'complain_submit' and chat['role'] == 'assistant':
+            types = chat.get('metadata', {}).get('com_type', [])
+            for t in types:
+                all_types.add(t)
+    return list(all_types)
+
+
 def retrieve_complaint_history(query, username, num_results=3):
     """ChromaDB에서 유사한 민원 기록을 검색합니다."""
     # 전처리를 적용한 쿼리로 검색
@@ -188,6 +210,19 @@ def generate_session_id():
     )
     return f"session_{counter['seq']}"
 
+# 💡 대화 내용을 요약하는 새로운 함수
+def summarize_conversation(chat_history):
+    """
+    주어진 대화 기록을 바탕으로 민원 내용을 요약합니다.
+    """
+    langchain_chat_history = get_langchain_history(chat_history)
+    try:
+        summary_result = summary_chain.invoke({"chat_history": langchain_chat_history})
+        return summary_result.strip()
+    except Exception as e:
+        logger.error(f"대화 요약 실패: {e}", exc_info=True)
+        return get_full_user_complaint_from_history(chat_history) # 요약 실패 시 기존 방식(전체 대화 합치기)으로 대체
+
 
 # --- 메인 핸들러 함수: 시나리오별 응답 처리 ---
 def handle_complain_submit(user_input, username, session_id, chat_history):
@@ -205,59 +240,27 @@ def handle_complain_submit(user_input, username, session_id, chat_history):
         logger.error(f"Complaint chain failed: {e}", exc_info=True)
         return {"response": "민원 유형을 파악하는 데 실패했습니다. 다시 말씀해주시겠어요?", "com_type": None, "is_final": False}
 
-    com_types = extract_complaint_types(llm_output)
+    llm_types = extract_complaint_types(llm_output)
 
-    # LLM이 '완료되었습니다'와 같은 확정 문장을 반환했을 때만 is_final을 True로 설정
-    # 그렇지 않으면, 질문을 던지는 단계이므로 is_final은 False
     is_final = ("완료되었습니다." in llm_output or "제보하겠습니다." in llm_output or "접수되었습니다." in llm_output)
 
+    # 💡 민원 접수 최종 단계에서만 요약본을 생성
     if is_final:
-        try:
-            # 민원 접수 시, 전체 민원 내용을 추출하여 저장
-            full_user_complaint = get_full_user_complaint_from_history(chat_history)
+        # 최종 답변일 경우, 이전 대화에서 누적된 민원 유형을 사용합니다.
+        # 이전에 챗봇이 추론했던 모든 유형을 가져와서 사용
+        com_types = get_com_types_from_history(chat_history)
+        # 최종 사용자 입력에 대한 유형도 추가
+        com_types.extend(extract_complaint_types(user_input))
+        # 중복 제거
+        com_types = list(set(com_types))
 
-            # MongoDB에 민원 기록을 저장하는 로직
-            complaint_doc = {
-                "com_id": COLLECTIONS["complaints"].database.counters.find_one_and_update(
-                    {'_id': 'com_id'},
-                    {'$inc': {'seq': 1}},
-                    upsert=True,
-                    return_document=ReturnDocument.AFTER
-                )['seq'],
-                "username": username,
-                "com_type": ','.join(com_types),
-                "com_contents": full_user_complaint,  # 수정된 부분: 전체 민원 내용 저장
-                "com_reg_date": datetime.now(timezone.utc)
-            }
-            COLLECTIONS["complaints"].insert_one(complaint_doc)
-            logger.info(f"Complaints 저장 완료: com_id={complaint_doc['com_id']}")
-
-            # ChromaDB에 임베딩 저장
-            preprocessed_text = preprocess_text(full_user_complaint)
-            com_type_string = ','.join(com_types)
-            if preprocessed_text:
-                vector_store.add_texts(
-                    texts=[preprocessed_text],
-                    metadatas=[{"com_type": com_type_string}]
-                )
-            logger.info("ChromaDB에 임베딩 저장 완료")
-
-        except Exception as e:
-            logger.error(f"민원 데이터 저장 실패: {e}", exc_info=True)
-
-        response = llm_output
+        # 💡 민원 내용 요약본 생성
+        summary = summarize_conversation(chat_history)
+        return {"response": llm_output, "com_type": com_types, "is_final": is_final, "summary": summary}
     else:
-        response = llm_output
-        if not com_types:
-            # LLM이 유형을 추론하지 않고 질문만 반환한 경우
-            response = llm_output
-        else:
-            # LLM이 유형을 추론했지만, 완료 메시지가 아닌 질문을 반환한 경우
-            # 이 경우는 LLM이 프롬프트 지시에 따라 질문을 생성한 것이므로
-            # 응답을 그대로 사용
-            response = llm_output
-
-    return {"response": response, "com_type": com_types, "is_final": is_final}
+        # 최종 답변이 아닐 경우, LLM이 현재 추론한 유형을 사용합니다.
+        com_types = llm_types
+        return {"response": llm_output, "com_type": com_types, "is_final": is_final}
 
 
 def handle_trash_finder(user_input, username, session_id):
