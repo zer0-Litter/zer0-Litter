@@ -300,12 +300,6 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None):
     if is_greeting(user_input):
         return {"response": "안녕하세요! 무엇을 도와드릴까요?", "session_id": session_id, "is_final": False}
 
-    # ❗️ 수정된 부분: "답변을 생성 중입니다..." 메시지 로직을 추가
-    # 이 부분은 실제로는 API에서 먼저 응답을 보내고, 백그라운드에서 다음 작업을 진행하는 방식이 이상적입니다.
-    # 여기서는 시간 지연과 출력으로만 시뮬레이션합니다.
-    print("AI: 답변을 생성 중입니다...")
-    time.sleep(1)  # 실제로는 이 부분에 비동기 처리 로직이 들어갑니다.
-
     if scenario_id == "complain_submit":
         result = handle_complain_submit(user_input, username, session_id, chat_history)
         result["session_id"] = session_id
