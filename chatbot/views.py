@@ -246,7 +246,7 @@ def chatbot_api(request):
         if result.get('is_final', False):
             com_type_from_router = result.get('com_type')
 
-            # 💡 챗봇으로부터 받은 요약본을 사용
+            # ❗️❗️❗️ 수정된 부분: 챗봇으로부터 받은 요약본을 사용
             complaint_summary = result.get('summary')
 
             # 💡 위치 정보는 첫 번째로 위치를 포함한 사용자 메시지에서 가져옴

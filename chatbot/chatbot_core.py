@@ -16,6 +16,8 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_chroma import Chroma
 from konlpy.tag import Okt
 import logging
+from langchain.chains import create_retrieval_chain
+from langchain_core.documents import Document
 
 from config import settings
 
@@ -32,7 +34,7 @@ COLLECTIONS = {
     "complaints": db['complaints'],
 }
 
-llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.7, max_tokens=70, api_key=settings.OPENAI_API_KEY)
+llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.5, max_tokens=70, api_key=settings.OPENAI_API_KEY)
 embeddings = OpenAIEmbeddings(api_key=settings.OPENAI_API_KEY)
 okt = Okt()
 
@@ -78,7 +80,7 @@ _complaint_chain_prompt = ChatPromptTemplate.from_messages([
         "기타 민원의 경우에는 정책 제안이나 쓰레기 무단투기 단속 강화 등이 있을 수 있어."
         "민원 타입이 추론되면 사용자에게 해당 유형이 맞는지 물어보고 확정하세요. "
         "예시: '쓰레기가 많이 쌓여서 청소요청이 필요하시다는 말씀이실까요?'"
-        "사용자가 '네', '맞아', '접수해줘'와 같이 긍정적으로 확인하면, 최종적으로 '민원 접수가 완료되었습니다.'와 같은 확정 문장을 반환하세요."
+        "사용자가 '네', '맞아', '어', '응', '접수해줘'와 같이 긍정적으로 확인하면, 최종적으로 '민원 접수가 완료되었습니다.'와 같은 확정 문장을 반환하세요."
         "최대한 간결하고 짧게 답변하세요."
     ),
     MessagesPlaceholder(variable_name="chat_history"),
@@ -173,18 +175,34 @@ def get_com_types_from_history(chat_history):
     return list(all_types)
 
 
-def retrieve_complaint_history(query, username, num_results=3):
-    """ChromaDB에서 유사한 민원 기록을 검색합니다."""
-    # 전처리를 적용한 쿼리로 검색
+# 💡 수정된 함수: ChromaDB 검색 로직을 as_retriever()를 사용하도록 변경
+def retrieve_complaint_history_with_filter(query, com_types, num_results=3):
+    """
+    ChromaDB에서 유사한 민원 기록을 검색하고, 제공된 민원 유형으로 결과를 필터링합니다.
+    """
     preprocessed_query = preprocess_text(query)
-    retrieved_docs_with_scores = vector_store.similarity_search_with_score(
-        query=preprocessed_query,
-        k=num_results
-    )
+
+    # ❗️ 수정된 부분: ChromaDB가 지원하는 '$eq', '$in' 연산자만 사용
+    where_filter = None
+    if com_types:
+        where_filter = {"com_type": {"$in": com_types}}
+
+    # ❗️ 수정된 부분: 필터가 있을 때만 `filter` 인자를 전달
+    if where_filter:
+        retriever = vector_store.as_retriever(
+            search_kwargs={"k": num_results, "filter": where_filter}
+        )
+    else:
+        retriever = vector_store.as_retriever(
+            search_kwargs={"k": num_results}
+        )
+
+    retrieved_docs = retriever.get_relevant_documents(preprocessed_query)
+
     context = ""
-    if retrieved_docs_with_scores:
-        doc, score = retrieved_docs_with_scores[0]
-        context = f"유사 민원: {doc.page_content} (관련도: {score:.2f})\n"
+    if retrieved_docs:
+        doc = retrieved_docs[0]
+        context = f"유사 민원: {doc.page_content}\n"
     return context.strip()
 
 
@@ -210,6 +228,7 @@ def generate_session_id():
     )
     return f"session_{counter['seq']}"
 
+
 # 💡 대화 내용을 요약하는 새로운 함수
 def summarize_conversation(chat_history):
     """
@@ -221,14 +240,17 @@ def summarize_conversation(chat_history):
         return summary_result.strip()
     except Exception as e:
         logger.error(f"대화 요약 실패: {e}", exc_info=True)
-        return get_full_user_complaint_from_history(chat_history) # 요약 실패 시 기존 방식(전체 대화 합치기)으로 대체
+        return get_full_user_complaint_from_history(chat_history)  # 요약 실패 시 기존 방식(전체 대화 합치기)으로 대체
 
 
 # --- 메인 핸들러 함수: 시나리오별 응답 처리 ---
 def handle_complain_submit(user_input, username, session_id, chat_history):
     """민원 접수 시나리오를 처리하고 라우터에 결과를 반환합니다."""
     langchain_chat_history = get_langchain_history(chat_history)
-    retrieved_context = retrieve_complaint_history(user_input, username)
+
+    current_com_types = get_com_types_from_history(chat_history)
+
+    retrieved_context = retrieve_complaint_history_with_filter(user_input, current_com_types)
 
     try:
         llm_output = complaint_chain.invoke({
@@ -244,21 +266,14 @@ def handle_complain_submit(user_input, username, session_id, chat_history):
 
     is_final = ("완료되었습니다." in llm_output or "제보하겠습니다." in llm_output or "접수되었습니다." in llm_output)
 
-    # 💡 민원 접수 최종 단계에서만 요약본을 생성
     if is_final:
-        # 최종 답변일 경우, 이전 대화에서 누적된 민원 유형을 사용합니다.
-        # 이전에 챗봇이 추론했던 모든 유형을 가져와서 사용
         com_types = get_com_types_from_history(chat_history)
-        # 최종 사용자 입력에 대한 유형도 추가
         com_types.extend(extract_complaint_types(user_input))
-        # 중복 제거
         com_types = list(set(com_types))
 
-        # 💡 민원 내용 요약본 생성
         summary = summarize_conversation(chat_history)
         return {"response": llm_output, "com_type": com_types, "is_final": is_final, "summary": summary}
     else:
-        # 최종 답변이 아닐 경우, LLM이 현재 추론한 유형을 사용합니다.
         com_types = llm_types
         return {"response": llm_output, "com_type": com_types, "is_final": is_final}
 
@@ -272,7 +287,9 @@ def handle_trash_finder(user_input, username, session_id):
 
 # --- 메인 라우터 함수: 전체 대화의 흐름 제어 ---
 def chatbot_router(user_input, username, session_id=None, scenario_id=None):
-    """사용자 입력에 따라 적절한 챗봇 시나리오를 라우팅합니다."""
+    """
+    사용자 입력에 따라 적절한 챗봇 시나리오를 라우팅합니다.
+    """
     if session_id is None:
         session_id = generate_session_id()
     if scenario_id is None:
@@ -282,6 +299,12 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None):
 
     if is_greeting(user_input):
         return {"response": "안녕하세요! 무엇을 도와드릴까요?", "session_id": session_id, "is_final": False}
+
+    # ❗️ 수정된 부분: "답변을 생성 중입니다..." 메시지 로직을 추가
+    # 이 부분은 실제로는 API에서 먼저 응답을 보내고, 백그라운드에서 다음 작업을 진행하는 방식이 이상적입니다.
+    # 여기서는 시간 지연과 출력으로만 시뮬레이션합니다.
+    print("AI: 답변을 생성 중입니다...")
+    time.sleep(1)  # 실제로는 이 부분에 비동기 처리 로직이 들어갑니다.
 
     if scenario_id == "complain_submit":
         result = handle_complain_submit(user_input, username, session_id, chat_history)
