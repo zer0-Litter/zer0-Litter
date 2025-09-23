@@ -14,6 +14,7 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
 from langchain.docstore.document import Document as LangchainDocument
 from langchain.chains import LLMChain
+from bson.objectid import ObjectId
 
 # 💡 로그 설정을 위한 로거 생성
 logger = logging.getLogger(__name__)
@@ -132,27 +133,6 @@ def get_next_file_id():
         return f"file_{uuid4()}"
 
 
-def get_next_chatbot_com_id():
-    """
-    MongoDB Counter를 사용하여 새로운 민원 ID(1000000 + *)를 생성합니다.
-    메인 시스템 ID와의 충돌을 방지하기 위한 로직입니다.
-    """
-    try:
-        counter = Counter.objects(name='chatbot_com_id').modify(
-            upsert=True, new=True, inc__seq=1
-        )
-        if not counter:
-            counter = Counter(name='chatbot_com_id', seq=1)
-            counter.save()
-            next_seq = 1
-        else:
-            next_seq = counter.seq
-        return 1000000 + next_seq
-    except Exception as e:
-        logger.error(f"chatbot_com_id 생성 실패: {e}")
-        return 900000000 + int(uuid4().int % 1000000)
-
-
 # --- 챗봇 API 엔드포인트 ---
 @csrf_exempt
 def chatbot_api(request):
@@ -229,6 +209,7 @@ def chatbot_api(request):
                 binary_data = f.read()
                 ChatFiles(
                     file_id=file_id,
+                    # ❗️❗️❗️ 수정된 부분: chat_id를 ChatHistory 객체 자체로 설정
                     chat_id=chat_doc,
                     file_name=f.name,
                     file_data=binary_data,
@@ -242,6 +223,8 @@ def chatbot_api(request):
     # 💡 ChatHistory에 챗봇 응답 저장
     try:
         is_final = result.get('is_final', False)
+        # ❗️❗️❗️ 수정된 부분: 챗봇 응답에 민원 유형(com_type)을 metadata에 저장
+        metadata = {'com_type': result.get('com_type', [])}
         ChatHistory(
             chat_id=get_next_chat_id(),
             username=username,
@@ -250,6 +233,7 @@ def chatbot_api(request):
             role='assistant',
             content=result.get('response', ''),
             is_final=is_final,
+            metadata=metadata,  # metadata를 여기서 저장
             created_at=datetime.now()
         ).save()
         print("ChatHistory 저장 완료(bot)")
@@ -262,26 +246,31 @@ def chatbot_api(request):
         if result.get('is_final', False):
             com_type_from_router = result.get('com_type')
 
-            # 💡 위치 정보가 누락되면 민원 저장 실패
-            if not lat or not lon:
-                logger.warning(f"민원(session_id: {session_id}) 저장을 위한 위치 정보가 부족합니다.")
+            # ❗️❗️❗️ 수정된 부분: 챗봇으로부터 받은 요약본을 사용
+            complaint_summary = result.get('summary')
+
+            # 💡 위치 정보는 첫 번째로 위치를 포함한 사용자 메시지에서 가져옴
+            location_doc = ChatHistory.objects(session_id=session_id, role='user', latitude__exists=True).order_by(
+                'created_at').first()
+
+            if not location_doc or not location_doc.latitude or not location_doc.longitude:
+                logger.warning(f"민원(session_id: {session_id}) 저장을 위한 위치 정보가 부족합니다. 민원 저장이 취소됩니다.")
                 return JsonResponse({
-                    'response': result.get('response', ''),
+                    'response': '죄송합니다. 위치 정보가 없어 민원 접수가 어렵습니다. 위치 정보를 포함하여 다시 시도해 주세요.',
                     'session_id': session_id
                 })
 
-            # 💡 민원 내용과 위치 정보가 담긴 사용자 메시지 찾기
-            user_chat_doc = ChatHistory.objects(session_id=session_id, role='user', latitude__exists=True).order_by(
-                '-created_at').first()
-            if not user_chat_doc:
-                logger.warning(f"민원(session_id: {session_id}) 저장을 위한 사용자 입력 기록이 부족합니다.")
-                return JsonResponse({
-                    'response': result.get('response', ''),
-                    'session_id': session_id
-                })
+            lat = location_doc.latitude
+            lon = location_doc.longitude
 
             if com_type_from_router:
-                complaint_id = get_next_chatbot_com_id()
+                # 💡 com_id를 complaints 컬렉션에서 1000000 이상의 가장 높은 값 + 1로 설정
+                latest_chatbot_complaint = Complaints.objects(com_id__gte=1000000).order_by('-com_id').first()
+                if latest_chatbot_complaint and isinstance(latest_chatbot_complaint.com_id, int):
+                    complaint_id = latest_chatbot_complaint.com_id + 1
+                else:
+                    complaint_id = 1000000  # 챗봇 민원 데이터가 없을 경우 1000000부터 시작
+
                 com_type_for_db = ', '.join(com_type_from_router) if isinstance(com_type_from_router,
                                                                                 list) else com_type_from_router
 
@@ -289,14 +278,20 @@ def chatbot_api(request):
                     "com_id": complaint_id,
                     "username": username,
                     "com_type": com_type_for_db,
-                    "lat": user_chat_doc.latitude,
-                    "lon": user_chat_doc.longitude,
-                    "com_contents": user_chat_doc.content,
+                    "lat": lat,
+                    "lon": lon,
+                    "com_contents": complaint_summary,  # 챗봇이 요약한 내용으로 저장
                     "com_reg_date": datetime.now()
                 }
 
+                # 💡 디버깅 코드 추가: 최종 저장될 com_contents 출력
+                print(f"최종 저장될 com_contents: {complaint_data['com_contents']}")
+
                 # 💡 해당 채팅에 첨부된 파일 정보(2개까지) 가져오기
-                related_files = ChatFiles.objects(chat_id=user_chat_doc).order_by("-uploaded_at")[:2]
+                user_complaints_docs = ChatHistory.objects(session_id=session_id, role='user',
+                                                           scenario_id='complain_submit').order_by('created_at')
+                related_files = ChatFiles.objects(chat_id__in=[doc.id for doc in user_complaints_docs]).order_by(
+                    "-uploaded_at")[:2]
 
                 for i, file in enumerate(related_files):
                     if i == 0:
@@ -310,7 +305,7 @@ def chatbot_api(request):
 
                 # 💡 2. 임베딩을 생성하여 ChromaDB에 저장
                 doc_to_embed = LangchainDocument(
-                    page_content=user_chat_doc.content,
+                    page_content=complaint_summary,  # 요약된 내용을 임베딩
                     metadata={
                         "username": username,
                         "com_id": complaint_id,
@@ -321,6 +316,10 @@ def chatbot_api(request):
                 print("ChromaDB에 임베딩 저장 완료")
     except Exception as e:
         logger.error(f"Complaints 및 임베딩 자동 생성 실패: {e}", exc_info=True)
+        return JsonResponse({
+            'response': '민원 접수 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',
+            'session_id': session_id
+        })
 
     # 💡 최종 응답 반환
     return JsonResponse({
