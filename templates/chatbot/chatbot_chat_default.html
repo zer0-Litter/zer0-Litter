@@ -4,8 +4,9 @@
 {% block title %}챗봇{% endblock %}
 {% block body_class %}chatbot-page{% endblock %}
 {% block extra_head %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.gl/orioncactus/pretendard/dist/web/variable/pretendardvariable.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard/dist/web/variable/pretendardvariable.css" />
 <link rel="stylesheet" href="{% static 'css/chatbot.css' %}">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 {% endblock %}
 
 {% block content %}
@@ -41,7 +42,11 @@
             <input type="hidden" id="latitudeInput" name="latitude">
             <input type="hidden" id="longitudeInput" name="longitude">
             <div class="input-buttons">
-                <label for="fileUpload" class="file-label">➕</label>
+                <label for="fileUpload" class="file-label">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                  </svg>
+                </label>
                 <input type="file" id="fileUpload" name="file" accept="image/*" capture="environment" style="display:none;" onchange="uploadFile()">
                 <button type="submit">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
