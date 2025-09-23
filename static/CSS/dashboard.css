@@ -102,7 +102,7 @@
 }
 
 .map-frame {
-  height: 600px; /* 지도의 높이 */
+  height: 400px; /* 지도의 높이 */
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid #eee;
