@@ -26,4 +26,47 @@
     {% endfor %}
   </ul>
 </section>
+
+<section class="map-card">
+  <h3 class="map-title">쓰레기 민원 지도</h3>
+
+  <div class="map-options">
+    <div class="map-filter">
+      <label for="map-dropdown">정렬 기준:</label>
+      <select id="map-dropdown" name="map-dropdown" onchange="location = this.value;">
+        <option value="?sort_by=all" {% if not request.GET.sort_by or request.GET.sort_by == 'all' %}selected{% endif %}>전체</option>
+        <option value="?sort_by=high" {% if request.GET.sort_by == 'high' %}selected{% endif %}>높은 순</option>
+        <option value="?sort_by=low" {% if request.GET.sort_by == 'low' %}selected{% endif %}>낮은 순</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="map-frame">
+    {% if map_html %}
+      {% autoescape off %}
+        {{ map_html }}
+      {% endautoescape %}
+    {% else %}
+      <p>지도를 불러오는 중 오류가 발생했습니다.</p>
+    {% endif %}
+  </div>
+
+  {% if highlighted_list %}
+  <div class="highlighted-list-card">
+    <div class="highlighted-list-title">
+        <h4>{{ highlighted_title }}</h4>
+    </div>
+    <div class="highlighted-grid">
+      {% for item in highlighted_list %}
+      <div class="highlighted-item">
+        <div class="district-name">{{ item.district }}</div>
+        <div class="complaint-count">{{ item.count }}건</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <p class="map-info">지도 위에 마우스를 올리면 민원 건수를 볼 수 있습니다.</p>
+  {% endif %}
+</section>
 {% endblock %}

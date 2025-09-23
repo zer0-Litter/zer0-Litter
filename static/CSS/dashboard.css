@@ -61,3 +61,106 @@
   font-size:12px;
   color:#6b7280;
 }
+
+/* 지도 섹션 스타일 */
+.map-card {
+  background:#fff;
+  border:1px solid #eee;
+  border-radius:12px;
+  padding:16px;
+  margin-top: 20px;
+  /* 동적 높이 조절을 위해 transition 추가 */
+  transition: height 0.3s ease-in-out;
+  display: flex; /* flexbox 레이아웃 적용 */
+  flex-direction: column; /* 세로 방향으로 정렬 */
+}
+
+.map-title {
+  font-weight:700;
+  font-size:16px;
+  margin:0 0 12px;
+}
+
+.map-options {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.map-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.map-filter label {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.map-filter select {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  font-size: 14px;
+}
+
+.map-frame {
+  height: 200px; /* 지도의 고정 높이 */
+  min-height: 200px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #eee;
+}
+
+.map-frame iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.map-info {
+    font-size: 14px;
+    color: #6b7280;
+    text-align: center;
+    margin-top: 16px;
+}
+
+/* 새로 추가된 강조된 지역구 목록 스타일 */
+.highlighted-list-card {
+  margin-top: 16px;
+}
+
+.highlighted-list-title h4 {
+  font-weight: 700;
+  font-size: 16px;
+  margin: 0;
+  padding-bottom: 12px;
+}
+
+.highlighted-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* 2열로 분할 */
+  gap: 10px;
+}
+
+.highlighted-item {
+  background: #f2f2f2;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 13px;
+  text-align: center;
+}
+
+.district-name {
+  font-weight: 600;
+  font-size: 15px;
+  color:#6b7280;
+  margin-bottom: 4px;
+}
+
+.complaint-count {
+  font-weight: 700;
+  font-size: 16px;
+  color: #000;
+}
