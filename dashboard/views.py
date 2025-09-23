@@ -39,7 +39,6 @@ def _timeago_kor(dt):
 
 @login_required(login_url='accounts:login')
 def dashboard(request):
-    # 기존 실시간 민원 현황 로직 (변화 없음)
     qs = Complaints.objects.order_by("-com_reg_date").limit(3)
     latest = []
     for c in qs:
@@ -56,10 +55,11 @@ def dashboard(request):
     map_html = None
     try:
         # 1. MongoDB에서 자치구별 민원 건수 집계
+        # "$split"과 "$arrayElemAt"을 사용하여 구 이름을 정확히 추출
         pipeline = [
             {"$match": {"com_location": {"$regex": "^서울특별시"}}},
             {"$group": {
-                "_id": {"$substr": ["$com_location", 6, -1]},
+                "_id": {"$arrayElemAt": [{"$split": ["$com_location", " "]}, 1]},
                 "count": {"$sum": 1}
             }}
         ]
@@ -67,9 +67,8 @@ def dashboard(request):
         complaints_collection = Complaints._get_collection()
         district_counts_cursor = complaints_collection.aggregate(pipeline)
 
-        # ❗❗MongoDB 결과를 딕셔너리로 변환, 키에서 '구'를 제거❗❗
-        # 이렇게 하면 'A2' 컬럼의 값과 정확히 매칭될 가능성이 높음
-        district_counts_dict = {item['_id']: item['count'] for item in district_counts_cursor}
+        # ❗❗ 딕셔너리로 변환, 키와 값을 모두 포함하도록 수정 ❗❗
+        district_counts_dict = {item['_id'].strip(): item['count'] for item in district_counts_cursor}
 
         # 2. GeoJSON 파일 로드 및 데이터 병합
         geo_file_path = os.path.join(
@@ -87,17 +86,17 @@ def dashboard(request):
         if 'A3' in gdf.columns and pd.api.types.is_datetime64_any_dtype(gdf['A3']):
             gdf['A3'] = gdf['A3'].astype(str)
 
-        # complaint_count 컬럼을 추가하고, 정확한 매핑을 위해 'A2' 컬럼 사용
+        # 'A2' 컬럼의 '서울시' 문자열을 제거하여 데이터 매칭
+        gdf['A2'] = gdf['A2'].str.replace('서울시', '', regex=False)
+
+        # complaint_count 컬럼 추가
         gdf['complaint_count'] = gdf['A2'].map(district_counts_dict).fillna(0).astype(int)
 
         # 3. Folium 맵 생성
         m = folium.Map(location=[37.5665, 126.9780], zoom_start=11, tiles="cartodbpositron", width='100%',
                        height='100%')
 
-        # ❗❗ Choropleth와 GeoJson 레이어 분리 ❗❗
-
-        # 1) Choropleth 레이어: 색상만 표시
-        # GeoDataFrame의 'A2' 컬럼을 key로 사용
+        # Choropleth 레이어: 색상만 표시
         folium.Choropleth(
             geo_data=gdf,
             data=gdf,
@@ -111,16 +110,13 @@ def dashboard(request):
             legend_name='자치구별 쓰레기 민원 건수',
         ).add_to(m)
 
-        # 2) GeoJson 레이어: 툴팁을 통해 정보 표시
-        # 투명한 레이어를 씌워 툴팁만 활성화
+        # GeoJson 레이어: 툴팁을 통해 정보 표시
         folium.GeoJson(
             gdf,
             name='자치구 정보',
             tooltip=folium.GeoJsonTooltip(fields=['A2', 'complaint_count'], aliases=['자치구:', '민원 건수:']),
             style_function=lambda x: {'fillColor': 'transparent', 'color': 'transparent', 'weight': 0},
         ).add_to(m)
-
-        # 드롭다운 정렬은 html에서 처리하므로, views.py에서는 별도의 정렬 로직이 필요 없음.
 
         map_html = m._repr_html_()
 
