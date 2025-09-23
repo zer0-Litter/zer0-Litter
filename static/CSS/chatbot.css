@@ -65,9 +65,7 @@ html, body {
   margin-bottom: 0.5rem;
   scroll-behavior: smooth;
   font-family: 'Pretendard Variable', sans-serif;
-
-  /* 텍스트 입력창과의 간격을 위해 하단에 여백을 추가합니다. */
-  padding-bottom: 8rem; /* 텍스트 입력창의 높이(약 4rem) + 여백을 고려하여 넉넉하게 설정 */
+  padding-bottom: 8rem;
 }
 
 /* 초기 인사말 스타일 */
@@ -80,7 +78,6 @@ html, body {
   font-weight: bold;
 }
 
-/* 시나리오 버튼 고정 섹션 스타일 */
 .scenario-buttons-fixed {
   display: flex;
   justify-content: space-around;
@@ -90,6 +87,7 @@ html, body {
   flex-shrink: 0;
 }
 
+/* ❗️ 수정된 부분: 버튼 내 SVG 아이콘 정렬을 위한 flexbox 적용 */
 .scenario-btn {
   padding: 0.5rem 1rem;
   font-size: 1.0rem;
@@ -100,6 +98,16 @@ html, body {
   font-weight: bold;
   cursor: pointer;
   transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.scenario-btn svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  stroke: #333333;
 }
 
 .scenario-btn:hover {
@@ -120,7 +128,6 @@ html, body {
 }
 
 .message-bubble {
-  background-color: #F5F5F5;
   padding: 0.6rem 1rem;
   border-radius: 20px;
   max-width: 60%;
@@ -134,17 +141,14 @@ html, body {
   background-color: #eff6f9;
 }
 
+.chat-message.assistant .message-bubble {
+  background-color: #F5F5F5;
+}
+
 .message-bubble img {
   max-width: 100px;
   max-height: 100px;
   border-radius: 10px;
-}
-
-.icon {
-  font-size: 1.2rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 
 /* chat-input: 인풋창의 선을 제거하고 크기를 조절합니다. */
@@ -156,7 +160,7 @@ html, body {
   z-index: 10;
 
   display: flex; /* Flexbox를 사용해 내부 요소 정렬 */
-  align-items: center;
+  align-items: flex-end;
   gap: 0.5rem;
 
   padding: 1rem;
