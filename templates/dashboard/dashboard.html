@@ -26,4 +26,29 @@
     {% endfor %}
   </ul>
 </section>
+
+<section class="map-card">
+  <h3 class="map-title">쓰레기 민원 지도</h3>
+
+  <div class="map-options">
+    <div class="map-filter">
+      <label for="map-dropdown">정렬 기준:</label>
+      <select id="map-dropdown" name="map-dropdown" onchange="location = this.value;">
+        <option value="?sort_by=all" {% if request.GET.sort_by == 'all' or not request.GET.sort_by %}selected{% endif %}>전체</option>
+        <option value="?sort_by=high" {% if request.GET.sort_by == 'high' %}selected{% endif %}>높은 순</option>
+        <option value="?sort_by=low" {% if request.GET.sort_by == 'low' %}selected{% endif %}>낮은 순</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="map-frame">
+    {% if map_html %}
+      {% autoescape off %}
+        {{ map_html }}
+      {% endautoescape %}
+    {% else %}
+      <p>지도를 불러오는 중 오류가 발생했습니다.</p>
+    {% endif %}
+  </div>
+</section>
 {% endblock %}
