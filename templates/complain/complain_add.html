@@ -250,7 +250,47 @@
         function updateAddressInput(latlng) {
             geocoder.coord2Address(latlng.getLng(), latlng.getLat(), function(result, status) {
                 if (status === kakao.maps.services.Status.OK) {
-                    const addr = result[0].address.address_name;
+                    let addr = "";
+
+                    // ✅ 광역시/도 풀네임 변환용 매핑
+                    const regionMap = {
+                        "서울": "서울특별시",
+                        "부산": "부산광역시",
+                        "대구": "대구광역시",
+                        "인천": "인천광역시",
+                        "광주": "광주광역시",
+                        "대전": "대전광역시",
+                        "울산": "울산광역시",
+                        "세종": "세종특별자치시",
+                        "경기": "경기도",
+                        "강원": "강원도",
+                        "충북": "충청북도",
+                        "충남": "충청남도",
+                        "전북": "전라북도",
+                        "전남": "전라남도",
+                        "경북": "경상북도",
+                        "경남": "경상남도",
+                        "제주": "제주특별자치도"
+                    };
+
+                    // ✅ 도로명주소 우선
+                    if (result[0].road_address) {
+                        addr = result[0].road_address.address_name;
+                    }
+                    // 도로명주소 없으면 → 지번주소 조합 (기존 기능 유지)
+                    else if (result[0].address) {
+                        const addressInfo = result[0].address;
+
+                        let region1 = regionMap[addressInfo.region_1depth_name] || addressInfo.region_1depth_name;
+                        addr = region1;
+
+                        if (addressInfo.region_2depth_name) addr += " " + addressInfo.region_2depth_name;
+                        if (addressInfo.region_3depth_name) addr += " " + addressInfo.region_3depth_name;
+                        if (addressInfo.main_address_no) addr += " " + addressInfo.main_address_no;
+                        if (addressInfo.sub_address_no) addr += "-" + addressInfo.sub_address_no;
+                    }
+
+                    // 기존 input에 값 채우기 (기능 유지)
                     const inputEl = document.getElementById('com_location') || document.getElementById('com_location_from_modal');
                     if (inputEl && !inputEl.readOnly) {
                         inputEl.value = addr;
@@ -699,94 +739,6 @@
 </script>
 
 <style>
-  /* 모달 스타일 개선 */
-  #trashDetailModal {
-    position: fixed;
-    z-index: 1000;
-    left: 0; top: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 10px;
-  }
-
-  .modal-content {
-    background: #fff;
-    width: 90%;
-    max-width: 320px;   /* 최대 크기 제한 */
-    max-height: 80vh;   /* 화면 높이의 80%를 넘지 않도록 */
-    overflow-y: auto;   /* 내용 많으면 스크롤 */
-    border-radius: 10px;
-    font-family: sans-serif;
-    position: relative;
-    padding: 0;
-  }
-
-  .close {
-    position: absolute;
-    right: 10px;
-    top: 8px;
-    font-size: 22px;
-    font-weight: bold;
-    cursor: pointer;
-    color: #444;
-  }
-
-  .trash-image img {
-    width: 100%;
-    height: 150px;        /* 이미지 높이 줄임 */
-    object-fit: cover;
-    border-top-left-radius: 10px;
-    border-top-right-radius: 10px;
-  }
-
-  .trash-info {
-    padding: 12px;
-  }
-
-  .trash-info h3 {
-    font-size: 15px;
-    margin-bottom: 8px;
-  }
-
-  .trash-type-wrap {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .trash-type img {
-    width: 25px;
-    height: 25px;
-  }
-
-  .type-name {
-    font-weight: bold;
-    font-size: 13px;
-  }
-
-  .type-loc {
-    font-size: 12px;
-    color: #666;
-  }
-
-  .modal-buttons {
-    display: flex;
-    border-top: 1px solid #ddd;
-  }
-
-  .modal-buttons button {
-    flex: 1;
-    padding: 10px 0;
-    border: none;
-    font-size: 14px;
-    cursor: pointer;
-  }
-
-  .btn-find { background: #f5f5f5; }
-  .btn-report { background: #1e90ff; color: white; }
-
   #fixed-pin {
       position: absolute;
       top: 50%;
