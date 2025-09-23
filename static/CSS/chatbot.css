@@ -49,7 +49,6 @@ html, body {
   margin-top: 1rem;
   margin-left: 0.5rem;
   margin-right: 0.5rem;
-  margin-bottom: 1rem;
   flex-shrink: 0;
   position: sticky;
   top: 0;
@@ -63,7 +62,6 @@ html, body {
   flex-direction: column;
   flex-grow: 1;
   overflow: hidden;
-  margin-top: 2rem;
   padding-bottom: 0;
   margin-bottom: 2rem;
 
@@ -206,6 +204,7 @@ html, body {
   resize: none;
   overflow-y: hidden;
   box-sizing: border-box;
+  font-family: 'Pretendard Variable', sans-serif;
 }
 
 /* 버튼들을 감싸는 컨테이너 */
