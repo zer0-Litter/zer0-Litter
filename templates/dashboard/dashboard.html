@@ -1,7 +1,29 @@
-{% extends 'nav_base.html' %}
-{% block title %}통계 보기{% endblock %}
+{% extends "nav_base.html" %}
+{% load static %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+{% endblock %}
 
 {% block content %}
-  <h1>대시보드</h1>
-  <p>여기에 원하는 내용을 작성하세요.</p>
+<section class="latest-card">
+  <h3 class="latest-title">실시간 쓰레기통별 민원 현황</h3>
+
+  <ul class="latest-feed">
+    {% for it in latest_complaints %}
+      <li class="latest-row">
+        <div class="left">
+          <img class="icon" src="{% static 'img/trashcan.png' %}" alt="trash">
+          <div class="meta">
+            <div class="region">{{ it.region }}</div>
+            <div class="type">{{ it.type_label }}</div>
+          </div>
+        </div>
+        <div class="right time">{{ it.timeago }}</div>
+      </li>
+    {% empty %}
+      <li class="latest-row empty">표시할 최신 민원이 없습니다.</li>
+    {% endfor %}
+  </ul>
+</section>
 {% endblock %}
