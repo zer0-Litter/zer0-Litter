@@ -21,17 +21,6 @@ from langchain_core.documents import Document
 
 from config import settings
 
-import jpype
-from konlpy import jvm
-
-# JVM이 켜져 있지 않으면 konlpy가 제공하는 jvm.init_jvm()으로 실행
-if not jpype.isJVMStarted():
-    jvm.init_jvm(jvmpath=r"C:\dev\java_11\jdk-11.0.0.2\bin\server\jvm.dll")
-
-from konlpy.tag import Okt
-
-okt = Okt()
-
 logger = logging.getLogger(__name__)
 
 load_dotenv()
