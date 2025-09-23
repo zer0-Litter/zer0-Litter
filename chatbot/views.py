@@ -15,6 +15,7 @@ from langchain_chroma import Chroma
 from langchain.docstore.document import Document as LangchainDocument
 from langchain.chains import LLMChain
 from bson.objectid import ObjectId
+from common.models import TrashLoc
 
 # 💡 로그 설정을 위한 로거 생성
 logger = logging.getLogger(__name__)
@@ -339,3 +340,79 @@ def chatbot_chat(request, scenario_id):
 def chatbot_chat_default(request):
     """기본 챗봇 채팅 페이지를 렌더링합니다."""
     return render(request, 'chatbot/chatbot_chat_default.html')
+
+
+
+@login_required
+def chatbot_chat_default(request):
+    return render(request, 'chatbot/chatbot_chat_default.html', {
+        'kakao_api_key': os.getenv('KAKAO_MAP_API_KEY'),
+        'district_id': '11000',
+    })
+
+@login_required
+def trash_bin_map(request, district_id=None):
+    if district_id:
+        try:
+            district_id_int = int(district_id)
+            trashcans = TrashLoc.objects.filter(t_district_id=district_id_int)
+            print(f"[trash_bin_map] district_id={district_id_int}, 결과 개수={trashcans.count()}")
+        except ValueError:
+            print(f"[trash_bin_map] 잘못된 district_id: {district_id}")
+            trashcans = TrashLoc.objects.none()
+    else:
+        trashcans = TrashLoc.objects.all()
+        print(f"[trash_bin_map] district_id 없음, 전체 {trashcans.count()}개 로드")
+
+    data = [
+        {
+            "t_lat": float(t.t_lat),
+            "t_lon": float(t.t_lon),
+            "t_road_addr": t.t_addr,
+            "t_detailed_addr": t.t_detailed_addr,
+            "t_trash_type": t.t_trash_type,
+            "t_loc": t.t_loc,
+            "t_dept": t.t_dept,
+            "t_contact": t.t_contact,
+            "t_district_id": t.t_district_id,
+        }
+        for t in trashcans
+    ]
+    return JsonResponse(data, safe=False)
+
+@login_required
+def trash_bin_list(request, district_id):
+    print(
+        f"Request Params - lat: {request.GET.get('lat')}, lon: {request.GET.get('lon')}, radius: {request.GET.get('radius')}")
+
+    try:
+        lat = float(request.GET.get('lat'))
+        lon = float(request.GET.get('lon'))
+        radius = float(request.GET.get('radius', 500))  # 기본 500m
+    except (TypeError, ValueError) as e:
+        print(f"[에러] 파라미터 변환 실패: {e}")
+        return JsonResponse({'error': 'Invalid parameters'}, status=400)
+
+    nearby = []
+    for t in TrashLoc.objects.all():
+        try:
+            if not t.t_lat or not t.t_lon:
+                continue  # 값이 None이거나 빈 문자열인 경우
+
+            dist = haversine(lat, lon, float(t.t_lat), float(t.t_lon))
+            if dist <= radius:
+                nearby.append({
+                    "t_lat": float(t.t_lat),
+                    "t_lon": float(t.t_lon),
+                    "t_road_addr": t.t_addr,
+                    "t_detailed_addr": t.t_detailed_addr,
+                    "t_trash_type": t.t_trash_type,
+                    "t_loc": t.t_loc,
+                    "t_dept": t.t_dept,
+                    "t_contact": t.t_contact,
+                })
+        except Exception as e:
+            print(f"[에러] 쓰레기통 {t.id} 처리 중 문제 발생: {e}")
+            continue  # 하나 실패해도 전체는 계속
+
+    return JsonResponse(nearby, safe=False)
