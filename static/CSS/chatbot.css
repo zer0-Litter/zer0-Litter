@@ -1,16 +1,22 @@
 /* Ensure HTML and Body take up the full viewport height */
 html, body {
+  /* 뷰포트 높이 100%로 설정하여 모바일 환경에서도 전체 화면을 사용하도록 합니다. */
   height: 100%;
   margin: 0;
   padding: 0;
-  overflow: hidden; /* This is the key to preventing full page scroll */
+  /* 오버플로우를 body에서만 제어하여 전체 스크롤을 막습니다. */
+  overflow: hidden;
+  font-family: 'Pretendard Variable', sans-serif;
+  font-size: 16px;
 }
 
 /* 챗봇 페이지에서만 body 태그의 스타일을 재정의하여 스크롤을 막고 중앙 정렬을 설정합니다. */
 .chatbot-page {
   display: flex;
   flex-direction: column;
+  /* ❗️ 핵심 수정: 수직 중앙 정렬로 변경 */
   justify-content: center;
+  /* ❗️ 핵심 수정: 수평 중앙 정렬 유지 */
   align-items: center;
   height: 100vh;
   overflow: hidden;
@@ -19,31 +25,37 @@ html, body {
 
 /* 챗봇 컨테이너를 화면 중앙에 고정하고, 테두리/배경을 제거합니다. */
 .chatbot-container {
-  font-family: 'Pretendard Variable', sans-serif;
   display: flex;
   flex-direction: column;
   max-width: 520px;
   width: 100%;
-  height: 100%; /* 부모 요소의 높이에 맞춥니다. */
+  height: 100%;
   border: none;
   border-radius: 0;
   background-color: transparent;
   padding: 0;
   box-shadow: none;
+  /* ❗️ 핵심 수정: 중앙 정렬을 위해 margin을 auto로 변경 */
   margin: 0 auto;
+  position: relative;
 }
 
 /* 상단 헤더 컨테이너 */
 .chat-header-container {
   display: flex;
   flex-direction: column;
-  padding: 1rem 0.5rem;
+  padding: 1.5rem 0.5rem;
   box-sizing: border-box;
   margin-top: 1rem;
   margin-left: 0.5rem;
   margin-right: 0.5rem;
   margin-bottom: 1rem;
   flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  background-color: #f9f9f9;
+  border-radius: 30px;
+  z-index: 10;
 }
 
 .chatbot-main {
@@ -51,6 +63,10 @@ html, body {
   flex-direction: column;
   flex-grow: 1;
   overflow: hidden;
+  margin-top: 2rem;
+  padding-bottom: 0;
+  margin-bottom: 2rem;
+
 }
 
 /* chat-window: 대화 내용만 스크롤되도록 설정 */
@@ -65,7 +81,8 @@ html, body {
   margin-bottom: 0.5rem;
   scroll-behavior: smooth;
   font-family: 'Pretendard Variable', sans-serif;
-  padding-bottom: 8rem;
+  /* ❗️ 핵심 수정: 입력창과 네비게이션바 사이의 여백을 줄이기 위해 패딩 값 조정 */
+  padding-bottom: 7rem;
 }
 
 /* 초기 인사말 스타일 */
@@ -87,9 +104,9 @@ html, body {
   flex-shrink: 0;
 }
 
-/* ❗️ 수정된 부분: 버튼 내 SVG 아이콘 정렬을 위한 flexbox 적용 */
 .scenario-btn {
-  padding: 0.5rem 1rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.5rem;
   font-size: 1.0rem;
   border: none;
   border-radius: 10px;
@@ -153,39 +170,41 @@ html, body {
 
 /* chat-input: 인풋창의 선을 제거하고 크기를 조절합니다. */
 .chat-input {
-  position: fixed; /* 하단에 고정 */
-  bottom: 4rem; /* 하단 네비게이션바의 높이만큼 띄워줍니다. */
-  width: calc(100% - 1rem); /* 좌우 마진 0.5rem씩 제거 */
-  max-width: 330px;
-  z-index: 10;
+  /* ❗️ 핵심 수정: position을 absolute로 변경하여 부모 요소(chatbot-container)를 기준으로 합니다. */
+  position: absolute;
+  /* ❗️ 핵심 수정: bottom 값을 0으로 설정하면 부모의 맨 아래에 딱 붙습니다. */
+  bottom: 0rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 350px;
+  width: calc(100% - 1rem);
 
-  display: flex; /* Flexbox를 사용해 내부 요소 정렬 */
+  z-index: 10;
+  display: flex;
   align-items: flex-end;
   gap: 0.5rem;
-
-  padding: 1rem;
-  flex-shrink: 0;
   box-sizing: border-box;
   background-color: white;
   border-radius: 30px;
   border: 1px solid #ccc;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  margin-bottom: 2.5rem;
-  margin-left: 0.5rem;
-  margin-right: 0.5rem;
+  padding: 1rem;
+  margin: 0;
+
 }
 
 /* 텍스트 입력 영역 */
 .chat-input textarea {
-  flex-grow: 1; /* 남은 공간을 모두 차지하도록 설정 */
-  min-height: 120px;
+  flex-grow: 1;
+  min-height: 5rem;
+  max-height: 5rem;
   border: none;
   outline: none;
   background: transparent;
   padding: 0;
   font-size: 1rem;
   resize: none;
-  overflow-y: auto;
+  overflow-y: hidden;
   box-sizing: border-box;
 }
 
@@ -194,15 +213,14 @@ html, body {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    flex-shrink: 0; /* 버튼 컨테이너가 줄어들지 않도록 고정 */
+    flex-shrink: 0;
 }
 
 /* 파일 업로드 버튼 ( + ) */
 .file-label {
-    font-size: 1.5rem;
     cursor: pointer;
     color: #555;
-    flex-shrink: 0; /* 버튼이 줄어들지 않도록 고정 */
+    flex-shrink: 0;
 }
 
 /* 전송 버튼 (SVG 포함) */
@@ -218,7 +236,7 @@ html, body {
     height: 2.5rem;
     cursor: pointer;
     padding: 0;
-    flex-shrink: 0; /* 버튼이 줄어들지 않도록 고정 */
+    flex-shrink: 0;
 }
 
 /* Hover 효과 수정 */
@@ -231,4 +249,10 @@ html, body {
     width: 1.5rem;
     height: 1.5rem;
     stroke: white;
+}
+
+.file-label svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  stroke: #555;
 }
