@@ -54,6 +54,7 @@ def dashboard(request):
 
     map_html = None
     highlighted_list = []
+    highlighted_title = ""
 
     try:
         # 1. MongoDB에서 자치구별 민원 건수 집계
@@ -91,7 +92,6 @@ def dashboard(request):
         sort_by = request.GET.get('sort_by')
 
         if sort_by == 'high' or sort_by == 'low':
-            # 높은 순 / 낮은 순일 경우: 배경을 회색으로 칠하고, 상위/하위 5개 지역만 강조
 
             # 모든 지역을 회색으로 먼저 채움
             folium.GeoJson(
@@ -121,6 +121,7 @@ def dashboard(request):
 
                 highlighted_list = top5[['A2', 'complaint_count']].rename(
                     columns={'A2': 'district', 'complaint_count': 'count'}).to_dict('records')
+                highlighted_title = "민원이 많은 지역구 목록"
 
             elif sort_by == 'low':
                 bottom5 = gdf.nsmallest(5, 'complaint_count')
@@ -139,6 +140,7 @@ def dashboard(request):
 
                 highlighted_list = bottom5[['A2', 'complaint_count']].rename(
                     columns={'A2': 'district', 'complaint_count': 'count'}).to_dict('records')
+                highlighted_title = "민원이 적은 지역구 목록"
 
         else:
             # 전체: 민원 건수별 색상 그라데이션 및 범례 (Choropleth 사용)
@@ -155,14 +157,14 @@ def dashboard(request):
                 legend_name='자치구별 쓰레기 민원 건수',
             ).add_to(m)
 
-        # 툴팁 추가 (높은/낮은 순일 때를 위해 별도로 추가)
-        if sort_by != 'all':
+            # 툴팁 추가
             folium.GeoJson(
                 gdf,
                 name='자치구 정보',
                 tooltip=GeoJsonTooltip(fields=['A2', 'complaint_count'], aliases=['자치구:', '민원 건수:']),
                 style_function=lambda x: {'fillColor': 'transparent', 'color': 'transparent', 'weight': 0},
             ).add_to(m)
+            highlighted_title = "지도 위에 마우스를 올리면 민원 건수를 볼 수 있습니다."
 
         m.fit_bounds(m.get_bounds())
 
@@ -176,4 +178,5 @@ def dashboard(request):
         "latest_complaints": latest,
         "map_html": map_html,
         "highlighted_list": highlighted_list,
+        "highlighted_title": highlighted_title,
     })
