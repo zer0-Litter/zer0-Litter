@@ -113,7 +113,13 @@
   border: 1px solid #eee;
 }
 
-.map-frame iframe {
+.map-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.map-container iframe {
   width: 100%;
   height: 100%;
   border: none;
@@ -145,22 +151,36 @@
 }
 
 .highlighted-item {
-  background: #f2f2f2;
+  background: #f8f8f8;
   border: 1px solid #eee;
   border-radius: 8px;
-  padding: 13px;
+  padding: 16px;
   text-align: center;
 }
 
 .district-name {
   font-weight: 600;
   font-size: 15px;
-  color:#6b7280;
+  color: #333;
   margin-bottom: 4px;
 }
 
 .complaint-count {
   font-weight: 700;
-  font-size: 16px;
+  font-size: 18px;
   color: #000;
+}
+
+/* 범례의 위치를 오른쪽 상단으로 이동 */
+.leaflet-control-container .leaflet-control.linear-cmap.leaflet-control-custom {
+  left: auto !important;
+  right: 10px !important;
+  top: 10px !important;
+}
+
+/* 범례 막대의 너비와 높이, 위치 조정 */
+.leaflet-control-container .leaflet-control.linear-cmap.leaflet-control-custom svg {
+  width: 150px !important;  /* 너비 증가 */
+  height: 20px !important; /* 높이 유지 */
+  margin-top: -10px !important; /* 위로 약간 이동 */
 }

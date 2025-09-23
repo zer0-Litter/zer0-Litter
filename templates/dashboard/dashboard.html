@@ -28,7 +28,7 @@
 </section>
 
 <section class="map-card">
-  <h3 class="map-title">쓰레기 민원 지도</h3>
+  <h3 class="map-title">자치구별 민원 지도</h3>
 
   <div class="map-options">
     <div class="map-filter">
@@ -42,6 +42,7 @@
   </div>
 
   <div class="map-frame">
+    <div class="map-container" id="folium-map">
     {% if map_html %}
       {% autoescape off %}
         {{ map_html }}
@@ -49,6 +50,7 @@
     {% else %}
       <p>지도를 불러오는 중 오류가 발생했습니다.</p>
     {% endif %}
+    </div>
   </div>
 
   {% if highlighted_list %}
