@@ -1,0 +1,63 @@
+.latest-card {
+  background:#fff;
+  border:1px solid #eee;
+  border-radius:12px;
+  padding:16px;
+}
+
+.latest-title {
+  font-weight:700;
+  font-size:16px;
+  margin:0 0 12px;
+}
+
+.latest-feed {
+  list-style:none;
+  margin:0;
+  padding:0;
+}
+
+.latest-row {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:10px 0;
+  border-top:1px solid #f2f2f2;
+}
+
+.latest-row:first-child {
+  border-top:none;
+}
+
+.left {
+  display:flex;
+  gap:10px;
+  align-items:center;
+}
+
+.icon {
+  width:40px;
+  height:40px;
+  opacity:.7;
+}
+
+.meta .region {
+  font-weight:600;
+}
+
+.right.time {
+  font-size:12px;
+  color:#6b7280;
+  white-space:nowrap;
+}
+
+.latest-row.empty {
+  color:#9ca3af;
+}
+
+.meta .type {
+  margin-top: 6px;   /* ← 4~10px 사이에서 취향껏 조절 */
+  line-height: 1.4;
+  font-size:12px;
+  color:#6b7280;
+}
