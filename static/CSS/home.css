@@ -1,9 +1,9 @@
-      .page-title {
-        font-size: 14px;  /* 글자 크기 */
-        text-align: center; /* 중앙 정렬 (옵션) */
-        margin-bottom: 20px; /* 아래 여백 */
-        font-weight: normal; /* 필요하면 두께 줄임 */
-      }
+.page-title {
+  font-weight:700;
+  font-size:16px;
+  margin:0 0 16px;
+}
+
 
 
       /* 추천 쓰레기통 리스트 */
