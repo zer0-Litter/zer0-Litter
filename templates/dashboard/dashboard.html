@@ -73,4 +73,115 @@
   <p class="map-info">지도 위에 마우스를 올리면 민원 건수를 볼 수 있습니다.</p>
   {% endif %}
 </section>
+
+<section class="chart-card">
+  <h3 class="chart-title">요일별 민원 현황</h3>
+  <p class="chart-info">데이터 갱신 시간: {{ last_updated_time }}</p>
+  <div class="chart-container">
+    <canvas id="dayOfWeekChart"></canvas>
+  </div>
+</section>
+
+<section class="response-time-card">
+  <h3 class="response-time-title">민원 평균 응답 시간</h3>
+  <div class="response-grid">
+    <div class="response-item fastest">
+      <span class="item-label">가장 빠른 처리 구</span>
+      <div class="item-value">
+        <span>{{ fastest_district.district }}</span>
+        <span class="time">{{ fastest_district.time }}</span>
+      </div>
+    </div>
+    <div class="response-item slowest">
+      <span class="item-label">가장 느린 처리 구</span>
+      <div class="item-value">
+        <span>{{ slowest_district.district }}</span>
+        <span class="time">{{ slowest_district.time }}</span>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_body %}
+<script src="{% static 'js/chart.umd.min.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const dayCtx = document.getElementById('dayOfWeekChart');
+
+  if (dayCtx) {
+    const labelsData = '{{ day_labels|safe }}';
+    const countsData = '{{ day_counts|safe }}';
+
+    try {
+      const labels = JSON.parse(labelsData);
+      const counts = JSON.parse(countsData);
+
+      if (labels.length === 0 || counts.length === 0) {
+        console.warn("차트 데이터가 비어있습니다. 차트를 그릴 수 없습니다.");
+        return;
+      }
+
+      new Chart(dayCtx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: '민원 건수',
+            data: counts,
+            // 색상 팔레트를 부드러운 파스텔톤으로 변경
+            backgroundColor: 'rgba(54, 162, 235, 0.8)', // 파스텔 블루
+            borderColor: 'rgba(128, 175, 230, 1)',
+            borderWidth: 1,
+            borderRadius: 6,
+            hoverBackgroundColor: 'rgba(128, 175, 230, 1)',
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: '민원 건수'
+              },
+              grid: {
+                display: false,
+                drawBorder: false,
+              },
+            },
+            x: {
+              title: {
+                display: true,
+                text: '요일'
+              },
+              grid: {
+                display: false,
+                drawBorder: false,
+              },
+            },
+          },
+          plugins: {
+            legend: {
+              display: false,
+            },
+            tooltip: {
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              titleColor: '#fff',
+              bodyColor: '#fff',
+              borderColor: '#fff',
+              borderWidth: 1,
+              cornerRadius: 5,
+            },
+          },
+        },
+      });
+    } catch (e) {
+      console.error("JSON 데이터를 파싱하는 중 오류가 발생했습니다:", e);
+    }
+  }
+});
+</script>
 {% endblock %}
