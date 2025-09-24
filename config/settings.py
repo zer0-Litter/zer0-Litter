@@ -213,3 +213,13 @@ INTERNAL_IPS = [
 
 LOGIN_URL = '/accounts/login/'  # 로그인하지 않았을 때 이동할 로그인 페이지
 LOGIN_REDIRECT_URL = '/trach_loc/home/'  # 로그인 후 이동할 기본 페이지
+
+# CACHES = {
+#     "default": {
+#         "BACKEND": "django_redis.cache.RedisCache",
+#         "LOCATION": "redis://127.0.0.1:6379/1",  # Redis 서버 주소
+#         "OPTIONS": {
+#             "CLIENT_CLASS": "django_redis.client.DefaultClient",
+#         }
+#     }
+# }

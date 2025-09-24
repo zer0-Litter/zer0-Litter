@@ -16,6 +16,9 @@ from folium.features import GeoJsonTooltip
 from collections import defaultdict
 
 
+# Django 캐싱 관련 라이브러리 제거
+# from django.core.cache import cache
+
 def _timeago_kor(dt):
     if not dt:
         return ""
@@ -39,8 +42,11 @@ def _timeago_kor(dt):
     return f"{weeks}주 전"
 
 
-def get_day_of_week_counts():
-    """요일별 민원 건수를 집계하는 함수"""
+def _get_day_of_week_counts():
+    """
+    MongoDB에서 직접 요일별 민원 건수를 가져오는 함수
+    """
+    print("\n--- 요일별 민원 데이터 계산 중... ---")
     pipeline = [
         {"$group": {
             "_id": {"$dayOfWeek": "$com_reg_date"},
@@ -51,17 +57,16 @@ def get_day_of_week_counts():
     counts_cursor = Complaints._get_collection().aggregate(pipeline)
 
     day_map = {1: '일', 2: '월', 3: '화', 4: '수', 5: '목', 6: '금', 7: '토'}
-
     day_counts = {day_map[i]: 0 for i in range(1, 8)}
     for item in counts_cursor:
         day_counts[day_map[item['_id']]] = item['count']
 
-    # --- 디버깅 코드 추가 ---
-    print("\n--- 요일별 민원 건수 (get_day_of_week_counts) ---")
-    print(day_counts)
-    print("---------------------------------------------------\n")
+    day_labels_json = json.dumps(list(day_counts.keys()))
+    day_counts_json = json.dumps(list(day_counts.values()))
 
-    return day_counts
+    print("--- 요일별 민원 데이터 계산 완료 ---")
+
+    return day_labels_json, day_counts_json
 
 
 def get_avg_response_time():
@@ -114,11 +119,6 @@ def get_avg_response_time():
             'time': time_str,
             'seconds': total_seconds
         })
-
-    # 디버깅용
-    # print("\n--- 평균 응답 시간 데이터 (get_avg_response_time) ---")
-    # print(avg_times)
-    # print("---------------------------------------------------\n")
 
     if not avg_times:
         return None, None
@@ -252,44 +252,38 @@ def dashboard(request):
             ).add_to(m)
             highlighted_title = "지도 위에 마우스를 올리면 민원 건수를 볼 수 있습니다."
 
+        m.fit_bounds(m.get_bounds())
+        map_html = m._repr_html_()
+
+        # --- HTML 문자열 직접 수정 (범례 위치 및 스타일 조정) ---
+        if map_html and "branca-linear-cmap" in map_html:
+            map_html = map_html.replace(
+                '<div class="leaflet-control-container">',
+                '<div class="leaflet-control-container" style="position: absolute; top: 0; right: 0;">'
+            )
+            map_html = re.sub(
+                r'(<svg[^>]*width="[^"]*"[^>]*height="[^"]*"[^>]*>)([\s\S]*?)(</svg>)',
+                r'<svg width="150" height="20" style="position:absolute; right:10px;">\2</svg>',
+                map_html
+            )
+            map_html = re.sub(
+                r'<text x="0.0%"[^>]*>([^<]+)</text>',
+                r'<text x="5%" style="font-size: 10px; text-anchor: middle;">\1</text>',
+                map_html
+            )
+            map_html = re.sub(
+                r'<text x="100.0%"[^>]*>([^<]+)</text>',
+                r'<text x="95%" style="font-size: 10px; text-anchor: middle;">\1</text>',
+                map_html
+            )
+
     except Exception as e:
         print(f"지도 생성 오류: {e}")
         map_html = "지도 생성에 오류가 발생했습니다."
 
-    m.fit_bounds(m.get_bounds())
-    map_html = m._repr_html_()
-
-    # --- HTML 문자열 직접 수정 (범례 위치 및 스타일 조정) ---
-    if map_html and "branca-linear-cmap" in map_html:
-        map_html = map_html.replace(
-            '<div class="leaflet-control-container">',
-            '<div class="leaflet-control-container" style="position: absolute; top: 0; right: 0;">'
-        )
-        map_html = re.sub(
-            r'(<svg[^>]*width="[^"]*"[^>]*height="[^"]*"[^>]*>)([\s\S]*?)(</svg>)',
-            r'<svg width="150" height="20" style="position:absolute; right:10px;">\2</svg>',
-            map_html
-        )
-        map_html = re.sub(
-            r'<text x="0.0%"[^>]*>([^<]+)</text>',
-            r'<text x="5%" style="font-size: 10px; text-anchor: middle;">\1</text>',
-            map_html
-        )
-        map_html = re.sub(
-            r'<text x="100.0%"[^>]*>([^<]+)</text>',
-            r'<text x="95%" style="font-size: 10px; text-anchor: middle;">\1</text>',
-            map_html
-        )
-
-    # ----------------------------------------------------
-    # 새로 추가된 부분: 요일별 민원 건수 및 평균 응답 시간 데이터
-    # ----------------------------------------------------
-
-    day_counts_dict = get_day_of_week_counts()
-
-    # json.dumps()를 통해 JSON 문자열로 변환
-    day_labels_json = json.dumps(list(day_counts_dict.keys()))
-    day_counts_json = json.dumps(list(day_counts_dict.values()))
+    # --- 기존 코드 수정: 캐싱 함수 호출 ---
+    # Redis 캐싱 함수를 직접 데이터 가져오는 함수로 변경
+    day_labels_json, day_counts_json = _get_day_of_week_counts()
 
     # --- 추가된 디버깅 코드 ---
     print("\n--- HTML 템플릿에 전달되는 차트 데이터 ---")
@@ -311,6 +305,9 @@ def dashboard(request):
     print(f"Slowest District: {slowest_district}")
     print("----------------------------------------\n")
 
+    # 갱신 시간 정보는 더 이상 Redis에서 가져오지 않으므로, 현재 시간으로 설정
+    last_updated_time = timezone.now().strftime('%Y년 %m월 %d일 %H시 %M분')
+
     return render(request, "dashboard/dashboard.html", {
         "latest_complaints": latest,
         "map_html": map_html,
@@ -320,4 +317,5 @@ def dashboard(request):
         "day_labels": day_labels_json,
         "fastest_district": fastest_district,
         "slowest_district": slowest_district,
+        "last_updated_time": last_updated_time,  # 갱신 시간 추가
     })

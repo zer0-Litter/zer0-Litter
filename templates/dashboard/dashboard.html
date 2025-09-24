@@ -76,6 +76,7 @@
 
 <section class="chart-card">
   <h3 class="chart-title">요일별 민원 현황</h3>
+  <p class="chart-info">데이터 갱신 시간: {{ last_updated_time }}</p>
   <div class="chart-container">
     <canvas id="dayOfWeekChart"></canvas>
   </div>
@@ -108,66 +109,78 @@
 document.addEventListener('DOMContentLoaded', function() {
   const dayCtx = document.getElementById('dayOfWeekChart');
 
-  // 요소가 존재하는지 확인하는 로그를 추가
-  console.log("Canvas element:", dayCtx);
-
   if (dayCtx) {
     const labelsData = '{{ day_labels|safe }}';
     const countsData = '{{ day_counts|safe }}';
 
-    // JSON 데이터가 유효한지 확인하는 로그를 추가
-    console.log("Labels Data String:", labelsData);
-    console.log("Counts Data String:", countsData);
+    try {
+      const labels = JSON.parse(labelsData);
+      const counts = JSON.parse(countsData);
 
-    const labels = JSON.parse(labelsData);
-    const counts = JSON.parse(countsData);
-
-    // 파싱된 데이터가 올바른지 확인하는 로그를 추가
-    console.log("Labels (Parsed):", labels);
-    console.log("Counts (Parsed):", counts);
-
-    if (labels.length === 0 || counts.length === 0) {
-      console.warn("차트 데이터가 비어있습니다. 차트를 그릴 수 없습니다.");
-      return;
-    }
-
-    new Chart(dayCtx, {
-      type: 'bar',
-      data: {
-        labels: labels,
-        datasets: [{
-          label: '민원 건수',
-          data: counts,
-          backgroundColor: 'rgba(54, 162, 235, 0.6)',
-          borderColor: 'rgba(54, 162, 235, 1)',
-          borderWidth: 1
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            beginAtZero: true,
-            title: {
-              display: true,
-              text: '민원 건수'
-            }
-          },
-          x: {
-            title: {
-              display: true,
-              text: '요일'
-            }
-          }
-        },
-        plugins: {
-          legend: {
-            display: false
-          }
-        }
+      if (labels.length === 0 || counts.length === 0) {
+        console.warn("차트 데이터가 비어있습니다. 차트를 그릴 수 없습니다.");
+        return;
       }
-    });
+
+      new Chart(dayCtx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: '민원 건수',
+            data: counts,
+            // 색상 팔레트를 부드러운 파스텔톤으로 변경
+            backgroundColor: 'rgba(54, 162, 235, 0.8)', // 파스텔 블루
+            borderColor: 'rgba(128, 175, 230, 1)',
+            borderWidth: 1,
+            borderRadius: 6,
+            hoverBackgroundColor: 'rgba(128, 175, 230, 1)',
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: '민원 건수'
+              },
+              grid: {
+                display: false,
+                drawBorder: false,
+              },
+            },
+            x: {
+              title: {
+                display: true,
+                text: '요일'
+              },
+              grid: {
+                display: false,
+                drawBorder: false,
+              },
+            },
+          },
+          plugins: {
+            legend: {
+              display: false,
+            },
+            tooltip: {
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              titleColor: '#fff',
+              bodyColor: '#fff',
+              borderColor: '#fff',
+              borderWidth: 1,
+              cornerRadius: 5,
+            },
+          },
+        },
+      });
+    } catch (e) {
+      console.error("JSON 데이터를 파싱하는 중 오류가 발생했습니다:", e);
+    }
   }
 });
 </script>
