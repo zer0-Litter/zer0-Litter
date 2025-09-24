@@ -44,11 +44,12 @@ ul {
 
 .modal-content {
   background-color: white;
-  padding: 20px 30px;
+  padding: 20px 24px;
   border-radius: 12px;
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
-  max-width: 400px;
-  width: 90%;
+  width: min(88vw, 320px);
+  max-width: 320px;
+  box-sizing: border-box;
   text-align: center;
   font-size: 16px;
   position: relative;
@@ -93,4 +94,8 @@ main {
 footer {
   height: 60px;          /* 하단 nav 높이 */
   flex-shrink: 0;
+}
+
+@media (max-width: 360px) {
+  .modal-content { width: calc(100vw - 32px); max-width: calc(100vw - 32px); }
 }
