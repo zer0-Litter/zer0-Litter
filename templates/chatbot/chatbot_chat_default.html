@@ -196,14 +196,7 @@ function appendMapMessage() {
 
   // ✅ 중앙 핑 고정
   const centerPin = document.createElement("div");
-  centerPin.innerHTML = "📍";
-  centerPin.style.position = "absolute";
-  centerPin.style.top = "50%";
-  centerPin.style.left = "50%";
-  centerPin.style.transform = "translate(-50%, -50%)";
-  centerPin.style.fontSize = "20px";
-  centerPin.style.pointerEvents = "none";
-  centerPin.style.zIndex = 10;
+  centerPin.id = "fixed-pin"; // CSS 적용 위해 id 부여
   container.appendChild(centerPin);
 
   // geocoder 생성
@@ -429,7 +422,7 @@ function loadTrashcans(lat, lon, radius = 10000) {
         window.open(url, "_blank");
       };
 
-      document.getElementById('trashDetailModal').style.display = 'block';
+      document.getElementById('trashDetailModal').style.display = 'flex';
     }
 
     function closeModal() {
