@@ -86,14 +86,17 @@ def dashboard(request):
         gdf['complaint_count'] = gdf['A2'].map(district_counts_dict).fillna(0).astype(int)
 
         # 3. Folium 맵 생성
-        m = folium.Map(location=[37.5665, 126.9780], zoom_start=11, tiles="cartodbpositron", width='100%',
-                       height='100%')
+        m = folium.Map(location=[37.5665, 126.9780], zoom_start=11, tiles="cartodbpositron",
+                       width='100%', height='100%', zoom_control=False)
 
         sort_by = request.GET.get('sort_by')
 
-        if sort_by == 'high' or sort_by == 'low':
+        if not gdf.empty:
+            max_count = gdf['complaint_count'].max()
+            min_count = gdf['complaint_count'].min()
 
-            # 모든 지역을 회색으로 먼저 채움
+        if sort_by == 'high' or sort_by == 'low':
+            # ... (이전 코드와 동일, 변경 없음)
             folium.GeoJson(
                 gdf,
                 style_function=lambda x: {
@@ -106,8 +109,6 @@ def dashboard(request):
 
             if sort_by == 'high':
                 top5 = gdf.nlargest(5, 'complaint_count')
-
-                # 상위 5개 지역을 빨간색으로 강조
                 folium.GeoJson(
                     top5,
                     style_function=lambda x: {
@@ -118,15 +119,11 @@ def dashboard(request):
                     },
                     tooltip=GeoJsonTooltip(fields=['A2', 'complaint_count'], aliases=['자치구:', '민원 건수:']),
                 ).add_to(m)
-
                 highlighted_list = top5[['A2', 'complaint_count']].rename(
                     columns={'A2': 'district', 'complaint_count': 'count'}).to_dict('records')
                 highlighted_title = "민원이 많은 지역구 목록"
-
             elif sort_by == 'low':
                 bottom5 = gdf.nsmallest(5, 'complaint_count')
-
-                # 하위 5개 지역을 파란색으로 강조
                 folium.GeoJson(
                     bottom5,
                     style_function=lambda x: {
@@ -137,13 +134,11 @@ def dashboard(request):
                     },
                     tooltip=GeoJsonTooltip(fields=['A2', 'complaint_count'], aliases=['자치구:', '민원 건수:']),
                 ).add_to(m)
-
                 highlighted_list = bottom5[['A2', 'complaint_count']].rename(
                     columns={'A2': 'district', 'complaint_count': 'count'}).to_dict('records')
                 highlighted_title = "민원이 적은 지역구 목록"
-
         else:
-            # 전체: 민원 건수별 색상 그라데이션 및 범례 (Choropleth 사용)
+            # folium.Choropleth만 사용하여 범례를 생성합니다.
             folium.Choropleth(
                 geo_data=gdf,
                 data=gdf,
@@ -153,11 +148,11 @@ def dashboard(request):
                 fill_opacity=0.7,
                 line_opacity=0.5,
                 line_color='black',
-                line_weight=1.5,
+                line_weight=1.0,
                 legend_name='자치구별 쓰레기 민원 건수',
+                show_colorbar=True
             ).add_to(m)
 
-            # 툴팁 추가
             folium.GeoJson(
                 gdf,
                 name='자치구 정보',
@@ -166,13 +161,43 @@ def dashboard(request):
             ).add_to(m)
             highlighted_title = "지도 위에 마우스를 올리면 민원 건수를 볼 수 있습니다."
 
-        m.fit_bounds(m.get_bounds())
-
-        map_html = m._repr_html_()
-
     except Exception as e:
         print(f"지도 생성 오류: {e}")
         map_html = "지도 생성에 오류가 발생했습니다."
+
+    m.fit_bounds(m.get_bounds())
+    map_html = m._repr_html_()
+
+    # --- HTML 문자열 직접 수정 (범례 위치 및 스타일 조정) ---
+    if map_html and "branca-linear-cmap" in map_html:
+        # 1. 범례를 포함하는 div의 위치를 오른쪽으로 옮깁니다.
+        # 이 코드는 그대로 유지합니다.
+        map_html = map_html.replace(
+            '<div class="leaflet-control-container">',
+            '<div class="leaflet-control-container" style="position: absolute; top: 0; right: 0;">'
+        )
+
+        # 2. 범례 SVG의 너비와 높이를 고정된 값으로 변경하고, 라벨 위치를 조정합니다.
+        # 모든 속성을 포함하는 SVG 태그를 찾아서 수정합니다.
+        map_html = re.sub(
+            r'(<svg[^>]*width="[^"]*"[^>]*height="[^"]*"[^>]*>)([\s\S]*?)(</svg>)',
+            r'<svg width="150" height="20" style="position:absolute; right:10px;">\2</svg>',
+            map_html
+        )
+
+        # 3. 범례 텍스트 위치를 조정합니다.
+        # 왼쪽 텍스트(0.0%)의 위치를 변경합니다.
+        map_html = re.sub(
+            r'<text x="0.0%"[^>]*>([^<]+)</text>',
+            r'<text x="5%" style="font-size: 10px; text-anchor: middle;">\1</text>',
+            map_html
+        )
+        # 오른쪽 텍스트(100.0%)의 위치를 변경합니다.
+        map_html = re.sub(
+            r'<text x="100.0%"[^>]*>([^<]+)</text>',
+            r'<text x="95%" style="font-size: 10px; text-anchor: middle;">\1</text>',
+            map_html
+        )
 
     return render(request, "dashboard/dashboard.html", {
         "latest_complaints": latest,
