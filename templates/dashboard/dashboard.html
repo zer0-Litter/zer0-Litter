@@ -73,4 +73,102 @@
   <p class="map-info">지도 위에 마우스를 올리면 민원 건수를 볼 수 있습니다.</p>
   {% endif %}
 </section>
+
+<section class="chart-card">
+  <h3 class="chart-title">요일별 민원 현황</h3>
+  <div class="chart-container">
+    <canvas id="dayOfWeekChart"></canvas>
+  </div>
+</section>
+
+<section class="response-time-card">
+  <h3 class="response-time-title">민원 평균 응답 시간</h3>
+  <div class="response-grid">
+    <div class="response-item fastest">
+      <span class="item-label">가장 빠른 처리 구</span>
+      <div class="item-value">
+        <span>{{ fastest_district.district }}</span>
+        <span class="time">{{ fastest_district.time }}</span>
+      </div>
+    </div>
+    <div class="response-item slowest">
+      <span class="item-label">가장 느린 처리 구</span>
+      <div class="item-value">
+        <span>{{ slowest_district.district }}</span>
+        <span class="time">{{ slowest_district.time }}</span>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_body %}
+<script src="{% static 'js/chart.umd.min.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const dayCtx = document.getElementById('dayOfWeekChart');
+
+  // 요소가 존재하는지 확인하는 로그를 추가
+  console.log("Canvas element:", dayCtx);
+
+  if (dayCtx) {
+    const labelsData = '{{ day_labels|safe }}';
+    const countsData = '{{ day_counts|safe }}';
+
+    // JSON 데이터가 유효한지 확인하는 로그를 추가
+    console.log("Labels Data String:", labelsData);
+    console.log("Counts Data String:", countsData);
+
+    const labels = JSON.parse(labelsData);
+    const counts = JSON.parse(countsData);
+
+    // 파싱된 데이터가 올바른지 확인하는 로그를 추가
+    console.log("Labels (Parsed):", labels);
+    console.log("Counts (Parsed):", counts);
+
+    if (labels.length === 0 || counts.length === 0) {
+      console.warn("차트 데이터가 비어있습니다. 차트를 그릴 수 없습니다.");
+      return;
+    }
+
+    new Chart(dayCtx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: '민원 건수',
+          data: counts,
+          backgroundColor: 'rgba(54, 162, 235, 0.6)',
+          borderColor: 'rgba(54, 162, 235, 1)',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: '민원 건수'
+            }
+          },
+          x: {
+            title: {
+              display: true,
+              text: '요일'
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: false
+          }
+        }
+      }
+    });
+  }
+});
+</script>
 {% endblock %}

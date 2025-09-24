@@ -146,7 +146,7 @@
 
 .highlighted-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr); /* 2열로 분할 */
+  grid-template-columns: repeat(3, 1fr); /* 3열로 분할 */
   gap: 10px;
 }
 
@@ -160,14 +160,14 @@
 
 .district-name {
   font-weight: 600;
-  font-size: 15px;
-  color: #333;
+  font-size: 14px;
+  color:#6b7280;
   margin-bottom: 4px;
 }
 
 .complaint-count {
   font-weight: 700;
-  font-size: 18px;
+  font-size: 16px;
   color: #000;
 }
 
@@ -183,4 +183,89 @@
   width: 150px !important;  /* 너비 증가 */
   height: 20px !important; /* 높이 유지 */
   margin-top: -10px !important; /* 위로 약간 이동 */
+}
+
+/* 그래프 카드 스타일 */
+.chart-card {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 20px;
+}
+
+.chart-title {
+  font-weight: 700;
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+
+/* 그래프 컨테이너 스타일 */
+.chart-container {
+    position: relative;
+    height: 300px; /* 원하는 높이로 설정 */
+    width: 100%;
+}
+
+/* 응답 시간 카드 스타일 */
+.response-time-card {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 20px;
+}
+
+.response-time-title {
+  font-weight: 700;
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+
+.response-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.response-item {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #f2f2f2;
+}
+
+.response-item.fastest {
+  background-color: #e6f7ff;
+}
+
+.response-item.slowest {
+  background-color: #ffe6e6;
+}
+
+.item-label {
+  font-weight: 600;
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 4px; /* 라벨 아래 여백 유지 */
+}
+
+.item-value {
+  display: flex;
+  justify-content: space-between; /* 구 이름과 시간을 양쪽 끝으로 정렬 */
+  align-items: center; /* 수직 가운데 정렬 */
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.item-value span {
+  font-size: 18px; /* 구 이름의 폰트 사이즈 */
+  color: #000;
+}
+
+.item-value .time {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 600;
 }

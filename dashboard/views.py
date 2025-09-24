@@ -3,8 +3,8 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
-from datetime import timezone as py_tz
-from common.models_mongo import Complaints
+from datetime import timezone as py_tz, timedelta
+from common.models_mongo import Complaints, ComplaintStatus
 from django.conf import settings
 import folium
 import geopandas as gpd
@@ -13,6 +13,7 @@ import re
 import json
 import pandas as pd
 from folium.features import GeoJsonTooltip
+from collections import defaultdict
 
 
 def _timeago_kor(dt):
@@ -36,6 +37,98 @@ def _timeago_kor(dt):
         return f"{days}일 전"
     weeks = days // 7
     return f"{weeks}주 전"
+
+
+def get_day_of_week_counts():
+    """요일별 민원 건수를 집계하는 함수"""
+    pipeline = [
+        {"$group": {
+            "_id": {"$dayOfWeek": "$com_reg_date"},
+            "count": {"$sum": 1}
+        }},
+        {"$sort": {"_id": 1}}
+    ]
+    counts_cursor = Complaints._get_collection().aggregate(pipeline)
+
+    day_map = {1: '일', 2: '월', 3: '화', 4: '수', 5: '목', 6: '금', 7: '토'}
+
+    day_counts = {day_map[i]: 0 for i in range(1, 8)}
+    for item in counts_cursor:
+        day_counts[day_map[item['_id']]] = item['count']
+
+    # --- 디버깅 코드 추가 ---
+    print("\n--- 요일별 민원 건수 (get_day_of_week_counts) ---")
+    print(day_counts)
+    print("---------------------------------------------------\n")
+
+    return day_counts
+
+
+def get_avg_response_time():
+    """민원 평균 응답 시간을 계산하는 함수"""
+    pipeline = [
+        {"$lookup": {
+            "from": "complaint_status",
+            "localField": "com_id",
+            "foreignField": "com_id",
+            "as": "statuses"
+        }},
+        {"$unwind": "$statuses"},
+        {"$match": {"statuses.status_name": "처리완료"}},
+        {"$addFields": {
+            "response_time_ms": {
+                "$subtract": ["$statuses.updated_at", "$com_reg_date"]
+            }
+        }},
+        {"$group": {
+            "_id": {"$arrayElemAt": [{"$split": ["$com_location", " "]}, 1]},
+            "avg_time_ms": {"$avg": "$response_time_ms"}
+        }},
+        {"$match": {"_id": {"$exists": True, "$ne": "서울특별시"}}}
+    ]
+
+    avg_times_cursor = Complaints._get_collection().aggregate(pipeline)
+
+    avg_times = []
+    for item in avg_times_cursor:
+        if item.get('avg_time_ms') is None or item.get('avg_time_ms') < 0:
+            continue
+
+        district = item['_id']
+        total_seconds = item['avg_time_ms'] / 1000
+
+        # --- 여기서 일, 시간, 분으로 변환 ---
+        days = int(total_seconds // 86400)
+        hours = int((total_seconds % 86400) // 3600)
+        minutes = int((total_seconds % 3600) // 60)
+
+        time_str = ""
+        if days > 0:
+            time_str += f"{days}일 "
+        if hours > 0:
+            time_str += f"{hours}시간 "
+        time_str += f"{minutes}분"
+
+        avg_times.append({
+            'district': district,
+            'time': time_str,
+            'seconds': total_seconds
+        })
+
+    # 디버깅용
+    # print("\n--- 평균 응답 시간 데이터 (get_avg_response_time) ---")
+    # print(avg_times)
+    # print("---------------------------------------------------\n")
+
+    if not avg_times:
+        return None, None
+
+    avg_times.sort(key=lambda x: x['seconds'])
+
+    fastest = avg_times[0]
+    slowest = avg_times[-1]
+
+    return fastest, slowest
 
 
 @login_required(login_url='accounts:login')
@@ -96,7 +189,6 @@ def dashboard(request):
             min_count = gdf['complaint_count'].min()
 
         if sort_by == 'high' or sort_by == 'low':
-            # ... (이전 코드와 동일, 변경 없음)
             folium.GeoJson(
                 gdf,
                 style_function=lambda x: {
@@ -138,7 +230,6 @@ def dashboard(request):
                     columns={'A2': 'district', 'complaint_count': 'count'}).to_dict('records')
                 highlighted_title = "민원이 적은 지역구 목록"
         else:
-            # folium.Choropleth만 사용하여 범례를 생성합니다.
             folium.Choropleth(
                 geo_data=gdf,
                 data=gdf,
@@ -170,38 +261,63 @@ def dashboard(request):
 
     # --- HTML 문자열 직접 수정 (범례 위치 및 스타일 조정) ---
     if map_html and "branca-linear-cmap" in map_html:
-        # 1. 범례를 포함하는 div의 위치를 오른쪽으로 옮깁니다.
-        # 이 코드는 그대로 유지합니다.
         map_html = map_html.replace(
             '<div class="leaflet-control-container">',
             '<div class="leaflet-control-container" style="position: absolute; top: 0; right: 0;">'
         )
-
-        # 2. 범례 SVG의 너비와 높이를 고정된 값으로 변경하고, 라벨 위치를 조정합니다.
-        # 모든 속성을 포함하는 SVG 태그를 찾아서 수정합니다.
         map_html = re.sub(
             r'(<svg[^>]*width="[^"]*"[^>]*height="[^"]*"[^>]*>)([\s\S]*?)(</svg>)',
             r'<svg width="150" height="20" style="position:absolute; right:10px;">\2</svg>',
             map_html
         )
-
-        # 3. 범례 텍스트 위치를 조정합니다.
-        # 왼쪽 텍스트(0.0%)의 위치를 변경합니다.
         map_html = re.sub(
             r'<text x="0.0%"[^>]*>([^<]+)</text>',
             r'<text x="5%" style="font-size: 10px; text-anchor: middle;">\1</text>',
             map_html
         )
-        # 오른쪽 텍스트(100.0%)의 위치를 변경합니다.
         map_html = re.sub(
             r'<text x="100.0%"[^>]*>([^<]+)</text>',
             r'<text x="95%" style="font-size: 10px; text-anchor: middle;">\1</text>',
             map_html
         )
 
+    # ----------------------------------------------------
+    # 새로 추가된 부분: 요일별 민원 건수 및 평균 응답 시간 데이터
+    # ----------------------------------------------------
+
+    day_counts_dict = get_day_of_week_counts()
+
+    # json.dumps()를 통해 JSON 문자열로 변환
+    day_labels_json = json.dumps(list(day_counts_dict.keys()))
+    day_counts_json = json.dumps(list(day_counts_dict.values()))
+
+    # --- 추가된 디버깅 코드 ---
+    print("\n--- HTML 템플릿에 전달되는 차트 데이터 ---")
+    print(f"day_labels_json: {day_labels_json}")
+    print(f"day_counts_json: {day_counts_json}")
+    print("------------------------------------------\n")
+
+    fastest_district, slowest_district = get_avg_response_time()
+
+    if not fastest_district:
+        fastest_district = {'district': '-', 'time': '데이터 없음'}
+    if not slowest_district:
+        slowest_district = {'district': '-', 'time': '데이터 없음'}
+
+    # --- 최종 템플릿 전달 데이터 디버깅 ---
+    print("\n--- 최종 템플릿 데이터 (dashboard) ---")
+    print(f"Day Counts: {day_counts_json}")
+    print(f"Fastest District: {fastest_district}")
+    print(f"Slowest District: {slowest_district}")
+    print("----------------------------------------\n")
+
     return render(request, "dashboard/dashboard.html", {
         "latest_complaints": latest,
         "map_html": map_html,
         "highlighted_list": highlighted_list,
         "highlighted_title": highlighted_title,
+        "day_counts": day_counts_json,
+        "day_labels": day_labels_json,
+        "fastest_district": fastest_district,
+        "slowest_district": slowest_district,
     })
