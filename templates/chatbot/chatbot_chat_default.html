@@ -30,12 +30,12 @@
           민원 제보하기
         </button>
       </div>
-      <input
-        type="text"
-        id="addressInput"
-        placeholder="지도에서 주소를 선택해주세요"
-        class="address-input"
-      />
+<!--      <input-->
+<!--        type="text"-->
+<!--        id="addressInput"-->
+<!--        placeholder="지도에서 주소를 선택해주세요"-->
+<!--        class="address-input"-->
+<!--      />-->
     </div>
 
     <div class="chatbot-main">
@@ -177,7 +177,7 @@ function appendMapMessage() {
   const container = document.createElement("div");
   container.id = "chatbotMap";
   container.style.width = "100%";
-  container.style.height = "100px";
+  container.style.height = "150px";
   container.style.borderRadius = "12px";
   container.style.marginTop = "8px";
   container.style.position = "relative";
@@ -455,21 +455,29 @@ function startScenario(scenarioId) {
   if (scenarioId === 'trash_finder') {
     messages = [
       '쓰레기통 찾기를 시작합니다.',
-      '지도에서 현재 위치를 확인해주세요.'
+      '아래 지도에서 현 위치를 확인하시고, 쓰레기통 아이콘을 눌러 길찾기를 할 수 있습니다.'
     ];
+    // 💡 변경: 메시지 배열을 순회하며 개별적으로 출력
+    messages.forEach(msg => {
+        appendMessage('assistant', msg);
+    });
     loadKakaoSdk(() => {
         appendMapMessage();
-      });
+    });
+
   } else if (scenarioId === 'complain_submit') {
     messages = [
       '민원 제보를 시작하겠습니다.',
       '어떤 것을 도와드릴까요?'
     ];
+    // 💡 변경: 메시지 배열을 순회하며 개별적으로 출력
+    messages.forEach(msg => {
+        appendMessage('assistant', msg);
+    });
   } else {
-    messages = [`시나리오 "${scenarioId}"를 시작합니다.`];
+    // 💡 변경: 단일 메시지도 appendMessage를 직접 호출하도록 변경
+    appendMessage('assistant', `시나리오 "${scenarioId}"를 시작합니다.`);
   }
-
-  appendMessage('assistant', messages.join('\n'));
 }
 
 // ---------------- 메시지 추가 (수정됨) ----------------
