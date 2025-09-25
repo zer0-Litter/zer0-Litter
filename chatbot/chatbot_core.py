@@ -275,7 +275,7 @@ def summarize_conversation(chat_history):
 
 
 # --- 메인 핸들러 함수: 시나리오별 응답 처리 ---
-def handle_complain_submit(user_input, username, session_id, chat_history):
+def handle_complain_submit(user_input, username, session_id, chat_history,  com_location):
     """민원 접수 시나리오를 처리하고 라우터에 결과를 반환합니다."""
 
     langchain_chat_history = get_langchain_history(chat_history)
@@ -437,13 +437,16 @@ def handle_trash_finder(user_input, username, session_id, com_location=None):
 
 
 # --- 메인 라우터 함수: 전체 대화의 흐름 제어 ---
+# chatbot/chatbot_core.py
+
+# ... (다른 함수 정의 생략) ...
+
 def chatbot_router(user_input, username, session_id=None, scenario_id=None, com_location=None):
     """
     사용자 입력에 따라 적절한 챗봇 시나리오를 라우팅합니다.
     """
     # 1. 세션 ID 확인 및 생성
     if session_id is None:
-        # 이 함수는 외부에서 정의되었다고 가정
         session_id = generate_session_id()
 
     # 2. 위치 확인 메시지 패턴을 확인하고 즉시 응답 반환 (가장 높은 우선순위)
@@ -456,16 +459,16 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None, com_
             "scenario_id": "trash_finder"
         }
 
-    # 3. 채팅 기록 불러오기 (모델 인스턴스 또는 딕셔너리 리스트를 반환한다고 가정)
+    # 3. 채팅 기록 불러오기
     chat_history = get_chat_history_from_db(session_id)
 
     # 💡 [강력한 제약 조건] 버튼 클릭 강제 로직
     CONSTRAINT_MESSAGE_START = "먼저 **'쓰레기통 위치 찾기'** 또는 **'민원 접수하기'**"
 
-    # 3-1. 이전 응답이 제약 조건 메시지였는지 확인 (기존 로직 유지)
+    # 3-1. 이전 응답이 제약 조건 메시지였는지 확인
     is_previous_constraint = False
     if chat_history:
-        # 💡 [오류 수정 적용]: chat.get('role')을 사용하여 딕셔너리 안전 접근
+        # 💡 딕셔너리 안전 접근
         last_assistant_message = next(
             (chat.get('content') for chat in reversed(chat_history)
              if chat.get('role') == 'assistant'),
@@ -475,16 +478,14 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None, com_
         if last_assistant_message and last_assistant_message.startswith(CONSTRAINT_MESSAGE_START):
             is_previous_constraint = True
 
-    # 3-2. 💡 [핵심 수정]: 첫 요청 시 유효한 시나리오 ID가 들어왔다면 제약을 건너뛰게 함
+    # 3-2. 첫 요청 시 유효한 시나리오 ID가 들어왔다면 제약을 건너뛰게 함
     is_valid_initial_scenario = (
             not chat_history and
             scenario_id in ("complain_submit", "trash_finder")
     )
 
     if is_previous_constraint or (not chat_history and not is_valid_initial_scenario):
-        # ☝️ is_valid_initial_scenario가 거짓일 때만 첫 요청에 제약 발동
-        # 이전 응답이 제약 조건이었거나, 첫 요청인데 유효한 시나리오 ID가 없다면 제약 발동
-
+        # 제약 조건 발동: 유효한 시나리오 선택을 강제
         return {
             "response": CONSTRAINT_MESSAGE_START + " 버튼을 클릭하여 시나리오를 선택해 주세요.",
             "session_id": session_id,
@@ -492,37 +493,76 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None, com_
             "scenario_id": "default"
         }
 
-    # 4. 시나리오 ID가 없다면 분류 진행 (버튼 클릭 강제 로직을 통과한 경우에만 실행)
-    if scenario_id is None or scenario_id == 'default':
-        # 이 함수는 외부에서 정의되었다고 가정
-        scenario_id = classify_scenario(user_input)
+    # 4. 시나리오 ID 결정 및 위치 정보 강제 (순서 조정)
 
-    # 5. 시나리오별 처리
+    # 💡 [핵심 추가]: 시나리오가 'complain_submit'으로 들어왔고, 위치 정보가 없을 때,
+    # 사용자의 입력 내용과 관계없이 위치 입력을 강제합니다. (가장 높은 우선순위)
+    if scenario_id == "complain_submit" and not com_location:
+        return {
+            "response": "민원 접수를 위해 먼저 **정확한 민원 발생 위치(주소)**를 입력해 주세요. 예: 서울특별시 중구 태평로1가 31",
+            "session_id": session_id,
+            "is_final": False,
+            "scenario_id": "complain_submit"
+        }
+
+    # 💡 [핵심 수정]: 긍정/부정 단어 목록 확장 및 확인 로직 변경
+    # 띄어쓰기 제거 후 소문자로 변환하여 비교합니다.
+    cleaned_input = user_input.replace(' ', '').lower()
+
+    # 긍정/부정 응답으로 간주할 키워드 목록
+    AFFIRM_OR_NEG_KEYWORDS = ["네", "맞아", "응", "어", "예", "아니", "별로", "노", "yes", "no"]
+
+    # 💡 키워드가 입력에 포함되는지 확인 (단순한 발언의 경우)
+    IS_AFFIRMATIVE_OR_NEGATIVE = False
+    for keyword in AFFIRM_OR_NEG_KEYWORDS:
+        if cleaned_input == keyword:  # '어'만 입력한 경우
+            IS_AFFIRMATIVE_OR_NEGATIVE = True
+            break
+        # '아니도' 처럼 접미사가 붙은 경우를 위해 부분 포함 검사는 위험하므로,
+        # 자주 쓰이는 단어만 명시적으로 검사하도록 유지합니다.
+        # (만약 '아니도'가 자주 쓰인다면 목록에 추가해야 합니다.)
+
+    # **로그에서 '어'가 실패했으므로, 다시 단어 목록 일치 방식으로 돌아가 '어'를 추가합니다.**
+    # 사용자님의 요구사항인 "어"는 명확히 처리되어야 합니다.
+
+    current_input_scenario = classify_scenario(user_input)
+
+    target_scenario_id = current_input_scenario
+
+    # 💡 [핵심 예외 로직 재확인]: 긍정/부정 응답이라면 기존 시나리오 ID를 따르도록 합니다.
+    if IS_AFFIRMATIVE_OR_NEGATIVE and scenario_id in ("complain_submit", "trash_finder"):
+        # 긍정/부정 응답은 기존 시나리오의 맥락을 따라가게 합니다.
+        target_scenario_id = scenario_id
+
+    # 💡 [최종 차단]: target_scenario_id가 핵심 시나리오가 아니라면 차단
+    if target_scenario_id not in ("complain_submit", "trash_finder"):
+        return {
+            "response": "죄송합니다. 저는 **쓰레기 관련 민원 접수**나 **쓰레기통 위치 찾기**만 전문적으로 도와드릴 수 있어요. 어떤 도움을 드릴까요?",
+            "session_id": session_id,
+            "is_final": False,
+            "scenario_id": "default"  # 시나리오 초기화
+        }
+
+    # 💡 최종 확정된 시나리오 ID를 라우터가 사용할 시나리오 ID로 설정
+    scenario_id = target_scenario_id
+
+    # 5. 시나리오별 처리 (여기 도달했다는 것은 유효한 시나리오가 확정되었음을 의미)
     if scenario_id == "complain_submit":
 
-        # 💡 [위치 정보 강제 로직 유지]
-        if not com_location:
-            return {
-                "response": "민원 접수를 위해 먼저 **정확한 민원 발생 위치(주소)**를 입력해 주세요. 예: 서울특별시 중구 태평로1가 31",
-                "session_id": session_id,
-                "is_final": False,
-                "scenario_id": "complain_submit"  # 시나리오 상태 유지
-            }
+        # 💡 [참고]: 이 위치에서는 이미 위에서 com_location이 체크되었으므로, if not com_location: 블록은 삭제합니다.
 
-        # 💡 위치 정보가 있다면, handle_complain_submit으로 전달
+        # 위치 정보가 있다면, handle_complain_submit으로 전달
         result = handle_complain_submit(user_input, username, session_id, chat_history, com_location)
         result["session_id"] = session_id
         return result
 
     elif scenario_id == "trash_finder":
-        # 이 함수는 외부에서 정의되었다고 가정
+        # ... (trash_finder 로직 유지) ...
         result = handle_trash_finder(user_input, username, session_id, com_location)
         result["session_id"] = session_id
         return result
 
     else:
-        # 💡 [일반 질문 처리]: 시나리오 분류 결과가 핵심 시나리오가 아닐 경우 (선택 사항)
-        # 이 부분은 현재 로직에서는 'default'로 간주되어 3-2에서 처리될 가능성이 높지만,
-        # classify_scenario가 'unknown' 등을 반환할 경우를 대비
+        # 최종 방어선 (이론상 도달하기 어려움)
         response = "지원하지 않는 질문입니다."
         return {"response": response, "session_id": session_id, "is_final": False}
