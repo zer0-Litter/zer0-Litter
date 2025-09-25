@@ -298,26 +298,25 @@ def handle_complain_submit(user_input, username, session_id, chat_history):
     is_final = ("완료되었습니다." in llm_output or "제보하겠습니다." in llm_output or "접수되었습니다." in llm_output)
 
     if is_final:
+        # 최종 민원 유형 확정
         com_types = get_com_types_from_history(chat_history)
+        # 사용자 마지막 발화에서 추론된 유형 추가
         com_types.extend(extract_complaint_types(user_input))
         com_types = list(set(com_types))
 
         summary = summarize_conversation(chat_history)
+
+        # 💡 [핵심 수정] is_final=True 일 때, com_type을 명시적으로 반환합니다.
         return {"response": llm_output, "com_type": com_types, "is_final": is_final, "summary": summary}
     else:
         com_types = llm_types
+        # 💡 [보완] is_final=False 일 때, com_type을 항상 빈 리스트라도 포함하여 반환합니다.
         return {"response": llm_output, "com_type": com_types, "is_final": is_final}
-
 
 
 # 💡 [최종 수정] handle_trash_finder 함수: 위치 기반 조회를 최우선으로 실행
 def handle_trash_finder(user_input, username, session_id, com_location=None):
     """쓰레기통 위치 안내 시나리오를 처리하고 라우터에 결과를 반환합니다."""
-
-    # 💡 1. '위치확인_주소:' 메시지 처리 (첫 번째 요청)
-    # 뷰에서 이 메시지를 받을 때 lat/lon을 ChatHistory에 저장한다고 가정
-    if user_input.startswith("위치확인_주소:"):
-        return {"response": "위치 확인했습니다. 무엇을 도와드릴까요?", "is_final": False}
 
     user_lat, user_lon = None, None
 
@@ -440,6 +439,8 @@ def handle_trash_finder(user_input, username, session_id, com_location=None):
 
 # --- 메인 라우터 함수: 전체 대화의 흐름 제어 ---
 # 💡 [수정] com_location 인자를 handle_trash_finder로 전달하도록 수정
+# --- 메인 라우터 함수: 전체 대화의 흐름 제어 ---
+# 💡 [수정] com_location 인자를 handle_trash_finder로 전달하도록 수정
 def chatbot_router(user_input, username, session_id=None, scenario_id=None, com_location=None):
     """
     사용자 입력에 따라 적절한 챗봇 시나리오를 라우팅합니다.
@@ -447,19 +448,20 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None, com_
     if session_id is None:
         session_id = generate_session_id()
 
-    # 💡 [핵심] 위치 확인 메시지 패턴을 확인
-    is_location_confirmed = False
-    if scenario_id == "trash_finder" and user_input.startswith("위치확인_주소:"):
+    # 💡 [핵심 수정] 위치 확인 메시지 패턴을 확인하고 즉시 응답 반환
+    if user_input.startswith("위치확인_주소:"):
         location_address = user_input.replace("위치확인_주소:", "").strip()
-        is_location_confirmed = True
+        # 이 시점에서 scenario_id를 trash_finder로 고정 (다음 요청을 위해)
 
-        # 💡 챗봇 응답을 즉시 반환 (요청하신 응답)
+        # 💡 요청하신 응답 "위치 확인했습니다. 무엇을 도와드릴까요?" 반환
         return {
-            "response": f"위치 확인했습니다. 무엇을 도와드릴까요?",
+            "response": "위치 확인했습니다. 무엇을 도와드릴까요?",
             "session_id": session_id,
-            "is_final": False  # 위치 확인 후 대화를 계속해야 하므로 False
+            "is_final": False,
+            "scenario_id": "trash_finder"  # 다음 라운드에 trash_finder로 인식하도록 설정
         }
 
+    # 위치 확인 패턴이 아니며, 시나리오 ID가 없다면 분류 진행
     if scenario_id is None:
         scenario_id = classify_scenario(user_input)
 
