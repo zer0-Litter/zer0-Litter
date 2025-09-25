@@ -30,6 +30,12 @@
           민원 제보하기
         </button>
       </div>
+      <input
+        type="text"
+        id="addressInput"
+        placeholder="지도에서 주소를 선택해주세요"
+        class="address-input"
+      />
     </div>
 
     <div class="chatbot-main">
@@ -171,7 +177,7 @@ function appendMapMessage() {
   const container = document.createElement("div");
   container.id = "chatbotMap";
   container.style.width = "100%";
-  container.style.height = "150px";
+  container.style.height = "100px";
   container.style.borderRadius = "12px";
   container.style.marginTop = "8px";
   container.style.position = "relative";
@@ -289,10 +295,10 @@ function appendMapMessage() {
                     }
 
 
-                    // 🔹 메시지 입력창에도 자동 입력
-                    const messageInput = document.getElementById('messageInput');
-                    if (messageInput) {
-                        messageInput.value = addr;
+                    // 🔹 새로 만든 주소 입력창에도 자동 입력
+                    const addressInput = document.getElementById('addressInput');
+                    if (addressInput) {
+                        addressInput.value = addr;
                     }
                 }
             });

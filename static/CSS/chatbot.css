@@ -360,3 +360,30 @@ html, body {
     pointer-events: none; /* 드래그 방해 안 하도록 */
     z-index: 1000;
 }
+
+.scenario-buttons-fixed {
+  display: flex;
+  flex-direction: column; /* 세로 배치 */
+  align-items: center;    /* 가운데 정렬 */
+}
+
+.button-group {
+  display: flex;
+  gap: 10px; /* 버튼 사이 간격 */
+}
+
+.address-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  color: #333;
+}
+
+.address-input::placeholder {
+  color: #aaa;
+}
+
