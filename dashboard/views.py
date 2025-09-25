@@ -139,10 +139,19 @@ def dashboard(request):
         region = c.com_location or "서울특별시"
         type_label = (c.com_type or "").strip()
         timeago = _timeago_kor(c.com_reg_date)
+
+        complaint_type = c.com_type
+        if isinstance(complaint_type, list):
+            icon_type = complaint_type[0] if complaint_type else "기타"
+        else:
+            icon_type = (complaint_type.split(",")[0].strip()
+                         if complaint_type else "기타")
+
         latest.append({
             "region": region,
             "type_label": type_label,
             "timeago": timeago,
+            "icon_type": icon_type,
         })
 
     map_html = None
