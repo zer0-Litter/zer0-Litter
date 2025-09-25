@@ -226,19 +226,50 @@ function appendMapMessage() {
   chatBox.appendChild(mapMsgDiv);
   chatBox.scrollTop = chatBox.scrollHeight;
 
-  // 💡 [추가] 확인 버튼 클릭 이벤트 리스너
+  // 💡 [수정] 확인 버튼 클릭 이벤트 리스너: 서버로 데이터 전송 추가
   confirmButton.addEventListener('click', () => {
-      const currentAddress = document.getElementById('addressInputOnChat').value;
-      if (currentAddress && currentAddress !== '마커를 움직여 현 위치를 선택해주세요') {
-          // 챗봇 대화창에 사용자 메시지 출력
+      const addressInputOnChat = document.getElementById('addressInputOnChat');
+      const currentAddress = addressInputOnChat.value;
+
+      // Hidden Input에서 위도/경도를 가져옴
+      const lat = document.getElementById('latitudeInput').value;
+      const lon = document.getElementById('longitudeInput').value;
+
+      // '마커를 움직여 현 위치를 선택해주세요'는 기본 placeholder이므로 유효한 주소로 간주하지 않음
+      if (currentAddress && currentAddress !== '마커를 움직여 현 위치를 선택해주세요' && lat && lon) {
+
+          // 1. 챗봇 대화창에 사용자 메시지 출력
+          // (appendMessage는 화면에만 출력하는 함수로 가정하며, 서버로 보내는 메시지와 분리)
           appendMessage('user', `현재 ${currentAddress} 에 있어.`);
 
-          // 사용자가 확인했으므로 버튼 비활성화 (선택 사항)
+          // 2. 서버로 보낼 데이터를 FormData로 구성
+          const data = new FormData();
+          // 챗봇 라우터가 위치 확인 시나리오로 인식할 수 있는 명시적인 메시지
+          const locationMessage = `위치확인_주소:${currentAddress}`;
+
+          data.append('message', locationMessage); // 💡 핵심: 서버로 위치 확인 메시지를 보냄
+          data.append('session_id', session_id || '');
+          data.append('scenario_id', current_scenario || 'trash_finder');
+
+          // 💡 핵심: 위도/경도, 그리고 최종 주소(com_location)를 FormData에 추가
+          data.append('lat', lat);
+          data.append('lon', lon);
+          data.append('com_location', currentAddress);
+
+          // 3. doFetch 함수를 통해 서버에 전송 (doFetch는 챗봇 응답을 받아 화면을 업데이트해야 함)
+          // doFetch 함수를 수정할 수 없다면, doFetch 함수가 FormData를 인자로 받도록 가정하고 호출합니다.
+          doFetch(data);
+
+          // 4. 사용자가 확인했으므로 버튼 비활성화
           confirmButton.disabled = true;
           confirmButton.textContent = '확인 완료';
           confirmButton.style.backgroundColor = '#ccc';
+
+          // 주소 입력창도 비활성화
+          addressInputOnChat.readOnly = true;
+
       } else {
-          alert('먼저 지도에서 위치를 확인하여 주소를 입력해주세요.');
+          alert('먼저 지도에서 유효한 위치를 선택하여 주소를 입력해주세요.');
       }
   });
 

@@ -1,6 +1,8 @@
 import os, re
 from datetime import datetime, timezone
 import time
+
+import logger
 from pymongo import MongoClient, ReturnDocument
 from dotenv import load_dotenv
 from langchain_core.prompts import (
@@ -20,6 +22,16 @@ from langchain.chains import create_retrieval_chain
 from langchain_core.documents import Document
 
 from config import settings
+
+# 💡 [추가] 거리 계산을 위한 import
+from math import radians, sin, cos, sqrt, atan2
+
+# 💡 [추가] TrashLoc 모델 import (사용자 요청에 따라 경로를 'common.models'로 가정)
+try:
+    from common.models import TrashLoc
+except ImportError:
+    logger.error("common.models.TrashLoc을 import 할 수 없습니다. 쓰레기통 위치 조회 기능이 제한됩니다.")
+    TrashLoc = None
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +65,25 @@ vector_store = Chroma(
     persist_directory="./chroma_db",
     client=chroma_client
 )
+
+
+# 💡 [추가] Haversine 함수 정의
+def haversine(lat1, lon1, lat2, lon2):
+    """두 지점 간의 거리를 Haversine 공식을 이용해 미터 단위로 계산합니다."""
+    R = 6371000  # 지구의 반지름 (미터)
+
+    lat1_rad, lon1_rad = radians(lat1), radians(lon1)
+    lat2_rad, lon2_rad = radians(lat2), radians(lon2)
+
+    dlon = lon2_rad - lon1_rad
+    dlat = lat2_rad - lat1_rad
+
+    a = sin(dlat / 2) ** 2 + cos(lat1_rad) * cos(lat2_rad) * sin(dlon / 2) ** 2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+
+    distance = R * c
+    return distance
+
 
 # --- 프롬프트 정의 ---
 trash_prompt = ChatPromptTemplate.from_messages([
@@ -278,20 +309,109 @@ def handle_complain_submit(user_input, username, session_id, chat_history):
         return {"response": llm_output, "com_type": com_types, "is_final": is_final}
 
 
-def handle_trash_finder(user_input, username, session_id):
+# 💡 [수정] handle_trash_finder 함수: 주변 쓰레기통 유무 확인 로직 추가 및 인자 추가
+def handle_trash_finder(user_input, username, session_id, com_location=None):
     """쓰레기통 위치 안내 시나리오를 처리하고 라우터에 결과를 반환합니다."""
+
+    user_lat, user_lon = None, None
+
+    # 1. 현 위치 (위도/경도) 가져오기: temp_com_location을 바탕으로 ChatHistory에서 조회 (가장 최근)
+    # 💡 [핵심] com_location이 전달되었더라도, 실제 위치(lat/lon)는 ChatHistory에서 가져와야 함.
+    #    (views.py에서 위치 확인 시 lat/lon을 ChatHistory에 저장한다고 가정)
+    location_doc = COLLECTIONS["history"].find_one(
+        {"session_id": session_id, "role": "user", "latitude": {"$exists": True, "$ne": None}},
+        sort=[("created_at", -1)]
+    )
+
+    if location_doc and location_doc.get("latitude") and location_doc.get("longitude"):
+        try:
+            user_lat = float(location_doc["latitude"])
+            user_lon = float(location_doc["longitude"])
+        except (ValueError, TypeError):
+            user_lat, user_lon = None, None
+
+    # 2. 위치 정보가 있을 경우에만 쓰레기통 조회 로직 실행
+    if user_lat is not None and user_lon is not None and TrashLoc:
+
+        # 3. 쓰레기통 데이터 조회 및 거리 계산
+        nearby_counts = {100: 0, 200: 0, 300: 0}  # 미터
+        try:
+            # 💡 [Django Model 사용 가정] TrashLoc.objects.all()로 모든 쓰레기통 조회
+            all_trashcans = TrashLoc.objects.all()
+
+            for t in all_trashcans:
+                # DB의 lat, lon이 DecimalField이므로, float으로 변환
+                if t.t_lat and t.t_lon:
+                    t_lat = float(t.t_lat)
+                    t_lon = float(t.t_lon)
+
+                    distance_m = haversine(user_lat, user_lon, t_lat, t_lon)
+
+                    # 300m 이내만 계산 (최대 범위)
+                    if distance_m <= 300:
+                        if distance_m <= 100:
+                            nearby_counts[100] += 1
+                        if distance_m <= 200:
+                            nearby_counts[200] += 1
+                        if distance_m <= 300:
+                            nearby_counts[300] += 1
+
+            # 4. 응답 생성
+            response_parts = []
+
+            # 100m 이내 개수 확인
+            if nearby_counts[100] > 0:
+                response_parts.append(f"현재 위치 주변 100m 이내에 쓰레기통 {nearby_counts[100]}개가 있습니다.")
+            else:
+                response_parts.append("현재 위치 주변 100m 이내에는 쓰레기통이 없습니다.")
+
+            # 200m 이내 추가 확인 (100m 초과 ~ 200m 이내)
+            if nearby_counts[200] > nearby_counts[100]:
+                response_parts.append(f"200m 이내로 범위를 넓히면 총 {nearby_counts[200]}개의 쓰레기통이 있습니다.")
+
+            # 300m 이내 추가 확인 (200m 초과 ~ 300m 이내)
+            if nearby_counts[300] > nearby_counts[200]:
+                response_parts.append(f"300m 이내로 범위를 넓히면 총 {nearby_counts[300]}개의 쓰레기통이 있습니다.")
+
+            if nearby_counts[300] == 0 and nearby_counts[100] == 0:
+                response_parts.append("300m 이내에는 쓰레기통이 없는 것 같아요. 다른 곳을 찾아보시겠어요?")
+
+            # LLM 체인을 타지 않고, 위치 정보 기반으로 직접 생성한 응답을 반환
+            return {"response": " ".join(response_parts), "is_final": False}
+
+        except Exception as e:
+            logger.error(f"쓰레기통 위치 조회 중 오류 발생: {e}", exc_info=True)
+            # 오류 발생 시, 일반적인 챗봇 응답으로 대체
+            pass  # 아래 기존 LLM 호출 로직으로 이동
+
+    # 5. 위치 정보가 없거나, 조회 중 오류가 발생했거나, 기타 일반적인 'trash_finder' 질문일 경우 LLM 호출 (기존 로직)
     response = trash_chain.invoke({"user_input": user_input})
     final_response = truncate_to_full_sentence(response.content)
     return {"response": final_response, "is_final": False}
 
 
 # --- 메인 라우터 함수: 전체 대화의 흐름 제어 ---
-def chatbot_router(user_input, username, session_id=None, scenario_id=None):
+# 💡 [수정] com_location 인자를 handle_trash_finder로 전달하도록 수정
+def chatbot_router(user_input, username, session_id=None, scenario_id=None, com_location=None):
     """
     사용자 입력에 따라 적절한 챗봇 시나리오를 라우팅합니다.
     """
     if session_id is None:
         session_id = generate_session_id()
+
+    # 💡 [핵심] 위치 확인 메시지 패턴을 확인
+    is_location_confirmed = False
+    if scenario_id == "trash_finder" and user_input.startswith("위치확인_주소:"):
+        location_address = user_input.replace("위치확인_주소:", "").strip()
+        is_location_confirmed = True
+
+        # 💡 챗봇 응답을 즉시 반환 (요청하신 응답)
+        return {
+            "response": f"위치 확인했습니다. 무엇을 도와드릴까요?",
+            "session_id": session_id,
+            "is_final": False  # 위치 확인 후 대화를 계속해야 하므로 False
+        }
+
     if scenario_id is None:
         scenario_id = classify_scenario(user_input)
 
@@ -305,7 +425,8 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None):
         result["session_id"] = session_id
         return result
     elif scenario_id == "trash_finder":
-        result = handle_trash_finder(user_input, username, session_id)
+        # 💡 [수정] com_location 인자를 handle_trash_finder로 전달
+        result = handle_trash_finder(user_input, username, session_id, com_location)
         result["session_id"] = session_id
         return result
     else:

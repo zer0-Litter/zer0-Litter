@@ -165,13 +165,17 @@ def chatbot_api(request):
 
     print(f"username={username}, input={user_input}, scenario_id={scenario_id}, session_id={session_id}")
 
+    # 💡 [핵심 수정] 요청에서 위치 주소(com_location)를 추출 (임시 저장)
+    temp_com_location = (request.POST.get('com_location') or '').strip()
+    print(f"temp_com_location={temp_com_location}")
+
     # 💡 요청에서 위치 정보(위도, 경도)를 추출
     lat = float(request.POST.get('lat')) if request.POST.get('lat') not in (None, '',) else None
     lon = float(request.POST.get('lon')) if request.POST.get('lon') not in (None, '',) else None
 
     # 💡 챗봇 라우터 호출
     try:
-        result = chatbot_router(user_input, username, session_id, scenario_id)
+        result = chatbot_router(user_input, username, session_id, scenario_id, temp_com_location)
         print("router 결과:", result)
     except Exception as e:
         logger.error(f"router 호출 실패: {e}", exc_info=True)
@@ -256,6 +260,20 @@ def chatbot_api(request):
             location_doc = ChatHistory.objects(session_id=session_id, role='user', latitude__exists=True).order_by(
                 'created_at').first()
 
+            # 💡 [핵심 수정] final_com_location 설정 로직
+            final_com_location = temp_com_location
+            if not final_com_location:
+                # ChatHistory에서 위치 확인 메시지(위치확인_주소:)를 찾아 주소 추출 (안전 장치)
+                location_msg_doc = ChatHistory.objects(session_id=session_id, role='user',
+                                                       content__startswith='위치확인_주소:').order_by(
+                    'created_at').first()
+                if location_msg_doc:
+                    final_com_location = location_msg_doc.content.replace('위치확인_주소:', '').strip()
+
+            # 💡 최종적으로도 주소 정보가 없으면 로깅 (위도/경도는 location_doc에서 이미 확인)
+            if not final_com_location:
+                logger.warning(f"민원(session_id: {session_id}) 저장을 위한 주소 정보(com_location)가 부족합니다.")
+
             if not location_doc or not location_doc.latitude or not location_doc.longitude:
                 logger.warning(f"민원(session_id: {session_id}) 저장을 위한 위치 정보가 부족합니다. 민원 저장이 취소됩니다.")
                 return JsonResponse({
@@ -284,7 +302,8 @@ def chatbot_api(request):
                     "lat": lat,
                     "lon": lon,
                     "com_contents": complaint_summary,  # 챗봇이 요약한 내용으로 저장
-                    "com_reg_date": datetime.now()
+                    "com_reg_date": datetime.now(),
+                    "com_location": final_com_location,  # 💡 핵심: Complaints에 최종 주소 저장
                 }
 
                 # 💡 디버깅 코드 추가: 최종 저장될 com_contents 출력
