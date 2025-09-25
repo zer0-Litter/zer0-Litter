@@ -523,10 +523,9 @@ function loadTrashcans(lat, lon, radius = 10000) {
 let session_id = null;
 let current_scenario = null;
 
-// ---------------- 시나리오 선택 ----------------
+// ---------------- 시나리오 선택 (수정됨: reset_session 플래그 추가) ----------------
 function startScenario(scenarioId) {
-  // ✅ 핵심 수정: 시나리오 시작 시 주소 입력창(헤더의)은 숨기고,
-  // 지도와 주소 입력창을 chat-window 내에 메시지로 출력합니다.
+  // ✅ 핵심 수정: 시나리오 시작 시 주소 입력창(헤더의)은 숨깁니다.
   const headerAddressInput = document.getElementById('addressInput');
   if (headerAddressInput) {
       headerAddressInput.style.display = 'none';
@@ -535,41 +534,32 @@ function startScenario(scenarioId) {
   current_scenario = scenarioId;
   let messages = [];
 
-  const initialAssistantMessage = document.querySelector('.initial-hidden');
-  if (initialAssistantMessage) {
-      initialAssistantMessage.style.display = 'flex';
-      initialAssistantMessage.classList.remove('initial-hidden');
-  }
+  // 1. 기존 채팅 내용을 모두 지웁니다 (시나리오 전환 시 화면 초기화)
+  document.getElementById('chatWindow').innerHTML = '';
 
+  // 2. 💡 [추가] 초기 메시지를 즉시 화면에 출력합니다.
   if (scenarioId === 'trash_finder') {
-    messages = [
-      '지도에서 현 위치를 확인하고, 쓰레기통을 눌러서 길을 찾을 수 있어요.'
-    ];
-    // 💡 변경: 메시지 배열을 순회하며 개별적으로 출력
-    messages.forEach(msg => {
-        appendMessage('assistant', msg);
-    });
-    // ✅ 지도/주소 로직을 chat-window 내 메시지로 출력
-    loadKakaoSdk(() => {
-        appendMapMessage(); // 지도와 주소 입력창이 포함된 메시지 버블을 추가
-    });
-
+    appendMessage('assistant', '지도에서 현 위치를 확인하고, 쓰레기통을 눌러서 길을 찾을 수 있어요.');
   } else if (scenarioId === 'complain_submit') {
-    messages = [
-      '민원을 넣기 위해서 현재 위치를 확인해주세요.'
-    ];
-    // 💡 변경: 메시지 배열을 순회하며 개별적으로 출력
-    messages.forEach(msg => {
-        appendMessage('assistant', msg);
-    });
-    // ✅ 지도/주소 로직을 chat-window 내 메시지로 출력
-    loadKakaoSdk(() => {
-        appendMapMessage(); // 지도와 주소 입력창이 포함된 메시지 버블을 추가
-    });
+    appendMessage('assistant', '민원을 넣기 위해서 현재 위치를 확인해주세요.');
   } else {
-    // 💡 변경: 단일 메시지도 appendMessage를 직접 호출하도록 변경
     appendMessage('assistant', `시나리오 "${scenarioId}"를 시작합니다.`);
   }
+
+  // 3. 💡 [핵심] 백엔드로 전송할 FormData 준비 및 doFetch 호출
+  const data = new FormData();
+  data.append('message', ''); // 초기 메시지는 빈 값으로 보냄 (라우터에서 처리)
+  data.append('session_id', ''); // 기존 세션 ID는 비워서 보냄
+  data.append('scenario_id', scenarioId); // 새로 시작할 시나리오 ID
+  data.append('reset_session', 'true'); // 💡 라우터에 세션 초기화 명령 전달
+
+  // 💡 [수정] doFetch를 먼저 호출하여 새 session_id를 받아옵니다.
+  doFetch(data, true);
+
+  // 4. 지도/주소 로직을 chat-window 내 메시지로 출력 (Kakao SDK 로드 후 실행)
+  loadKakaoSdk(() => {
+    appendMapMessage(); // 지도와 주소 입력창이 포함된 메시지 버블을 추가
+  });
 }
 
 // ---------------- 메시지 추가 (수정됨) ----------------
@@ -598,8 +588,17 @@ function appendMessage(role, text, imgUrl=null) {
   return msgDiv;
 }
 
-// ---------------- fetch 호출 (수정됨) ----------------
-function doFetch(formData) {
+// (주의: 기존 코드에서 resetFlag를 파라미터로 받았으므로, 시그니처는 유지했습니다.
+//  내부 로직에서 resetFlag를 직접 사용하는 부분은 없습니다.)
+function doFetch(formData, resetFlag = false) {
+
+  // 💡 기존 formData에 reset_session 플래그가 없는 경우를 대비하여 추가
+  if (!formData.has('reset_session')) {
+       // 버튼 클릭 시 (startScenario)에는 이미 'true'로 추가되었고,
+       // 일반 메시지/파일 전송 시에는 'false'로 추가됩니다.
+       formData.append('reset_session', resetFlag ? 'true' : 'false');
+  }
+
   const loadingMessageElement = appendMessage('assistant', '답변을 준비 중입니다...');
 
   fetch('/chatbot/chatbot_api/', {
