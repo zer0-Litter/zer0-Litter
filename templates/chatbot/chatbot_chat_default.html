@@ -177,32 +177,70 @@ function appendMapMessage() {
   // ✅ 지도/주소 버블 생성 (Assistant 메시지처럼 보이도록)
   const mapMsgDiv = document.createElement('div');
   mapMsgDiv.className = `chat-message assistant map-message`; // 새로운 클래스 추가
+  // 💡 [수정] 지도 메시지 컨테이너의 최대 폭을 크게 설정
+  mapMsgDiv.style.maxWidth = 'calc(100% - 10px)'; // 챗윈도우 폭에 거의 가깝게 확장
 
   const mapBubble = document.createElement('div');
   mapBubble.className = 'message-bubble map-bubble';
+  // 💡 [수정] 버블의 폭을 100%로 설정하여 부모(mapMsgDiv)의 확장된 폭을 따름
+  mapBubble.style.width = '100%';
   mapMsgDiv.appendChild(mapBubble);
 
   // ✅ 지도 DOM 생성
   const mapContainer = document.createElement("div");
   mapContainer.id = "chatbotMap";
   mapContainer.style.width = "100%";
-  mapContainer.style.height = "150px";
+  mapContainer.style.height = "160px";
   mapContainer.style.borderRadius = "10px"; // 버블 안에 들어가므로 약간 작게
   mapContainer.style.position = "relative";
   mapBubble.appendChild(mapContainer);
+
+  // ✅ 주소 입력창과 버튼을 감싸는 컨테이너 생성 (주소 입력창 옆에 버튼을 넣기 위해)
+  const addressConfirmContainer = document.createElement('div');
+  addressConfirmContainer.className = 'address-confirm-container';
+  // 💡 [수정] 주소/버튼 컨테이너의 폭도 100%로 설정
+  addressConfirmContainer.style.width = '100%';
+  mapBubble.appendChild(addressConfirmContainer);
 
   // ✅ 주소 입력창 (지도 바로 아래에 오도록)
   const addressInput = document.createElement('input');
   addressInput.type = 'text';
   addressInput.id = 'addressInputOnChat'; // 챗윈도우 내부의 ID로 구분
-  addressInput.placeholder = '지도에서 주소를 선택해주세요';
+  addressInput.placeholder = '마커를 움직여 현 위치를 선택해주세요';
   addressInput.className = 'address-input';
   addressInput.readOnly = true;
-  addressInput.style.marginTop = '8px'; // 지도 아래 여백
-  mapBubble.appendChild(addressInput);
+  // ❌ [제거] 인라인 마진 제거 (CSS 파일에서 처리하거나, 'address-confirm-container'가 처리하도록 위임)
+  addressInput.style.marginTop = '0';
+  addressInput.style.marginBottom = '0';
+  addressInput.style.marginLeft = '0';
+  addressInput.style.marginRight = '0';
+  addressConfirmContainer.appendChild(addressInput);
+
+  // ✅ 확인 버튼 생성
+  const confirmButton = document.createElement('button');
+  confirmButton.textContent = '확인';
+  confirmButton.id = 'confirmLocationBtn';
+  confirmButton.className = 'confirm-button'; // CSS 스타일링을 위한 클래스
+  addressConfirmContainer.appendChild(confirmButton);
 
   chatBox.appendChild(mapMsgDiv);
   chatBox.scrollTop = chatBox.scrollHeight;
+
+  // 💡 [추가] 확인 버튼 클릭 이벤트 리스너
+  confirmButton.addEventListener('click', () => {
+      const currentAddress = document.getElementById('addressInputOnChat').value;
+      if (currentAddress && currentAddress !== '마커를 움직여 현 위치를 선택해주세요') {
+          // 챗봇 대화창에 사용자 메시지 출력
+          appendMessage('user', `${currentAddress} 여기시군요.`);
+
+          // 사용자가 확인했으므로 버튼 비활성화 (선택 사항)
+          confirmButton.disabled = true;
+          confirmButton.textContent = '확인 완료';
+          confirmButton.style.backgroundColor = '#ccc';
+      } else {
+          alert('먼저 지도에서 위치를 확인하여 주소를 입력해주세요.');
+      }
+  });
 
   // ✅ 지도 초기화
   map = new kakao.maps.Map(mapContainer, {
@@ -474,8 +512,8 @@ function startScenario(scenarioId) {
 
   if (scenarioId === 'trash_finder') {
     messages = [
-      '안녕하세요. 쓰레기통 찾기를 시작합니다.',
-      '아래 지도에서 현 위치를 확인하시고, 쓰레기통 아이콘을 눌러 길찾기를 할 수 있습니다.'
+      '아래 지도에서 현 위치를 확인하시고,',
+      '쓰레기통 아이콘을 눌러 길찾기를 할 수 있습니다.'
     ];
     // 💡 변경: 메시지 배열을 순회하며 개별적으로 출력
     messages.forEach(msg => {

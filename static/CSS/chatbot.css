@@ -171,12 +171,13 @@ html, body {
 
 /* 지도와 주소 입력창이 들어가는 메시지 버블 스타일 */
 .chat-message.assistant.map-message .message-bubble {
-    padding: 0; /* 내부 요소가 패딩을 직접 갖도록 조정 */
+    padding: 10px;
     flex-direction: column;
     align-items: flex-start;
-    width: 100vh; /* 지도 크기를 위해 확장 */
+    /* 🚨 [수정] max-width와 width 설정을 제거하거나 100%로 설정하여 인라인 스타일을 따르도록 함 */
+    max-width: 100%; /* 부모에 따라 확장되도록 */
+    width: 100%; /* 부모에 따라 확장되도록 */
 }
-
 
 /* chat-input: 인풋창의 선을 제거하고 크기를 조절합니다. */
 .chat-input {
@@ -384,9 +385,26 @@ html, body {
   gap: 10px; /* 버튼 사이 간격 */
 }
 
-/* 🚨 수정: 지도 아래에 위치할 address-input 스타일 */
-.address-input {
-  width: 100%;
+
+.address-input::placeholder {
+  color: #aaa;
+}
+
+/* 🚨 [새로 추가된 CSS] 주소 입력창과 확인 버튼을 감싸는 컨테이너 */
+.address-confirm-container {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* 주소창과 버튼 사이 간격 */
+    width: 100%;
+    margin-top: 8px; /* 지도 아래 여백 */
+    /* 💡 [추가] 좌우 패딩을 주어 지도 버블과 동일하게 정렬 */
+    padding: 0 0px;
+}
+
+/* 🚨 수정: 지도 아래에 위치할 address-input 스타일 (address-confirm-container 내부에 맞춰 수정) */
+.address-confirm-container .address-input {
+  flex-grow: 1; /* 남은 공간을 모두 차지 */
+  width: auto; /* flex-grow 때문에 width: 100% 대신 auto 사용 */
   padding: 10px 14px;
   border: 1px solid #ddd;
   border-radius: 20px;
@@ -394,11 +412,27 @@ html, body {
   outline: none;
   box-sizing: border-box;
   color: #333;
-  /* margin-top: 0.5rem; -> JS에서 추가함 */
-  background-color: white; /* 읽기 전용 느낌 강조 */
-  cursor: default; /* 읽기 전용임을 표시 */
+  margin: 0; /* 컨테이너가 마진을 제어하도록 */
+  background-color: white;
+  cursor: default;
 }
 
-.address-input::placeholder {
-  color: #aaa;
+/* 🚨 추가: 확인 버튼 스타일 */
+.confirm-button {
+    flex-shrink: 0; /* 버튼이 줄어들지 않도록 */
+    background-color: #FFEA91; /* 전송 버튼과 동일한 색상 */
+    color: #000000;
+    border: none;
+    border-radius: 10px; /* 주소창과 유사한 둥근 모서리 */
+    padding: 6px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    height: 30px; /* 주소 입력창과 높이 맞추기 */
+}
+
+.confirm-button:hover {
+    background-color: #000000;
+    color: white;
 }
