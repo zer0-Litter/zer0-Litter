@@ -14,12 +14,13 @@ html, body {
 .chatbot-page {
   display: flex;
   flex-direction: column;
-  /* ❗️ 핵심 수정: 수직 중앙 정렬로 변경 */
+  /* ❗️ 핵심 수정: 수직 중앙 정렬로 복구 */
   justify-content: center;
   /* ❗️ 핵심 수정: 수평 중앙 정렬 유지 */
   align-items: center;
   height: 100vh;
-  overflow: hidden;
+  /* 🚨 최종 수정: 오버플로우 발생 시 스크롤 허용 */
+  overflow: hidden; /* 스크롤 방지 */
   background-color: #f9f9f9;
 }
 
@@ -32,7 +33,6 @@ html, body {
 
   /* 🚨 최종 수정: 뷰포트 높이에서 하단 네비게이션바(약 4.5rem) 높이를 뺍니다. */
   height: 660px;
-
   border: none;
   border-radius: 0;
   background-color: transparent;
