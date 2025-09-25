@@ -30,12 +30,14 @@
           민원 제보하기
         </button>
       </div>
-<!--      <input-->
-<!--        type="text"-->
-<!--        id="addressInput"-->
-<!--        placeholder="지도에서 주소를 선택해주세요"-->
-<!--        class="address-input"-->
-<!--      />-->
+      <input
+        type="text"
+        id="addressInput"
+        placeholder="지도에서 주소를 선택해주세요"
+        class="address-input"
+        readonly
+        style="display: none;"
+      />
     </div>
 
     <div class="chatbot-main">
@@ -47,6 +49,7 @@
             <textarea id="messageInput" placeholder="메시지를 입력하세요..." autocomplete="off" rows="1"></textarea>
             <input type="hidden" id="latitudeInput" name="latitude">
             <input type="hidden" id="longitudeInput" name="longitude">
+            <input type="hidden" id="comLocationInput" name="com_location">
             <div class="input-buttons">
                 <label for="fileUpload" class="file-label">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
@@ -65,7 +68,6 @@
     <input type="hidden" id="lat-input" name="lat">
     <input type="hidden" id="lon-input" name="lon">
 
-    <!-- 🔹 쓰레기통 상세 모달 -->
     <div id="trashDetailModal" style="display:none;">
       <div class="modal-content">
         <span class="close" onclick="closeModal()">&times;</span>
@@ -168,29 +170,47 @@ function appendMapMessage() {
   const chatBox = document.getElementById("chatWindow");
   if (!chatBox) return;
 
-
-  // ✅ 중복 지도 제거
+  // ✅ 중복 지도/주소 제거
   const oldMap = document.getElementById("chatbotMap");
-  if (oldMap) oldMap.remove();
+  if (oldMap) oldMap.closest('.chat-message').remove(); // 지도 전체 버블 제거
+
+  // ✅ 지도/주소 버블 생성 (Assistant 메시지처럼 보이도록)
+  const mapMsgDiv = document.createElement('div');
+  mapMsgDiv.className = `chat-message assistant map-message`; // 새로운 클래스 추가
+
+  const mapBubble = document.createElement('div');
+  mapBubble.className = 'message-bubble map-bubble';
+  mapMsgDiv.appendChild(mapBubble);
 
   // ✅ 지도 DOM 생성
-  const container = document.createElement("div");
-  container.id = "chatbotMap";
-  container.style.width = "100%";
-  container.style.height = "150px";
-  container.style.borderRadius = "12px";
-  container.style.marginTop = "8px";
-  container.style.position = "relative";
+  const mapContainer = document.createElement("div");
+  mapContainer.id = "chatbotMap";
+  mapContainer.style.width = "100%";
+  mapContainer.style.height = "150px";
+  mapContainer.style.borderRadius = "10px"; // 버블 안에 들어가므로 약간 작게
+  mapContainer.style.position = "relative";
+  mapBubble.appendChild(mapContainer);
 
-  chatBox.appendChild(container);
+  // ✅ 주소 입력창 (지도 바로 아래에 오도록)
+  const addressInput = document.createElement('input');
+  addressInput.type = 'text';
+  addressInput.id = 'addressInputOnChat'; // 챗윈도우 내부의 ID로 구분
+  addressInput.placeholder = '지도에서 주소를 선택해주세요';
+  addressInput.className = 'address-input';
+  addressInput.readOnly = true;
+  addressInput.style.marginTop = '8px'; // 지도 아래 여백
+  mapBubble.appendChild(addressInput);
+
+  chatBox.appendChild(mapMsgDiv);
+  chatBox.scrollTop = chatBox.scrollHeight;
 
   // ✅ 지도 초기화
-  map = new kakao.maps.Map(container, {
+  map = new kakao.maps.Map(mapContainer, {
     center: new kakao.maps.LatLng(37.5665, 126.9780),
     level: 5,
   });
 
-  // ✅ 마커 추가
+  // ✅ 마커 이미지 로드 (기존 로직 유지)
   grayMarkerImage = new kakao.maps.MarkerImage(
     "/static/img/marker_trash_gray.png",
     new kakao.maps.Size(32, 40)
@@ -202,13 +222,13 @@ function appendMapMessage() {
 
   // ✅ 중앙 핑 고정
   const centerPin = document.createElement("div");
-  centerPin.id = "fixed-pin"; // CSS 적용 위해 id 부여
-  container.appendChild(centerPin);
+  centerPin.id = "fixed-pin";
+  mapContainer.appendChild(centerPin);
 
   // geocoder 생성
-      const geocoder = new kakao.maps.services.Geocoder();
+  const geocoder = new kakao.maps.services.Geocoder();
 
-  // ✅ 현재 위치 가져오기
+  // ✅ 현재 위치 가져오기 및 초기 지도/주소 설정
   if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(position => {
           const lat = position.coords.latitude;
@@ -216,7 +236,6 @@ function appendMapMessage() {
           userPosition = new kakao.maps.LatLng(lat, lon);
           map.setCenter(userPosition);
 
-          // 최초 좌표 반영
           document.getElementById('latitudeInput').value = lat;
           document.getElementById('longitudeInput').value = lon;
 
@@ -229,82 +248,76 @@ function appendMapMessage() {
         setDefaultCenter();
       }
 
-      // ✅ 지도 움직일 때마다 중심 좌표를 hidden input에 업데이트
-      kakao.maps.event.addListener(map, 'center_changed', function () {
-            const center = map.getCenter();
-            const lat = center.getLat();
-            const lon = center.getLng();
+  // ✅ 지도 움직일 때마다 중심 좌표를 hidden input에 업데이트
+  kakao.maps.event.addListener(map, 'center_changed', function () {
+        const center = map.getCenter();
+        const lat = center.getLat();
+        const lon = center.getLng();
 
-            // hidden input
-            document.getElementById('latitudeInput').value = lat;
-            document.getElementById('longitudeInput').value = lon;
+        // hidden input 업데이트
+        document.getElementById('latitudeInput').value = lat;
+        document.getElementById('longitudeInput').value = lon;
 
-            // 지도 중앙 좌표 → 주소 변환
-            updateAddressInput(center);
-        });
+        // 지도 중앙 좌표 → 주소 변환
+        updateAddressInput(center);
+    });
 
-        // 주소 업데이트 함수
-        function updateAddressInput(latlng) {
-            geocoder.coord2Address(latlng.getLng(), latlng.getLat(), function(result, status) {
-                if (status === kakao.maps.services.Status.OK) {
-                    let addr = "";
+  // 주소 업데이트 함수
+  function updateAddressInput(latlng) {
+      geocoder.coord2Address(latlng.getLng(), latlng.getLat(), function(result, status) {
+          if (status === kakao.maps.services.Status.OK) {
+              let addr = "";
+              const regionMap = { /* ... (지역 보정 맵) */
+                  "서울": "서울특별시",
+                  "부산": "부산광역시",
+                  "대구": "대구광역시",
+                  "인천": "인천광역시",
+                  "광주": "광주광역시",
+                  "대전": "대전광역시",
+                  "울산": "울산광역시",
+                  "세종": "세종특별자치시",
+                  "경기": "경기도",
+                  "강원": "강원도",
+                  "충북": "충청북도",
+                  "충남": "충청남도",
+                  "전북": "전라북도",
+                  "전남": "전라남도",
+                  "경북": "경상북도",
+                  "경남": "경상남도",
+                  "제주": "제주특별자치도"
+              };
 
-                    // ✅ region_1depth_name 보정 맵
-                    const regionMap = {
-                        "서울": "서울특별시",
-                        "부산": "부산광역시",
-                        "대구": "대구광역시",
-                        "인천": "인천광역시",
-                        "광주": "광주광역시",
-                        "대전": "대전광역시",
-                        "울산": "울산광역시",
-                        "세종": "세종특별자치시",
-                        "경기": "경기도",
-                        "강원": "강원도",
-                        "충북": "충청북도",
-                        "충남": "충청남도",
-                        "전북": "전라북도",
-                        "전남": "전라남도",
-                        "경북": "경상북도",
-                        "경남": "경상남도",
-                        "제주": "제주특별자치도"
-                    };
+              if (result[0].road_address) {
+                  addr = result[0].road_address.address_name;
+              }
+              else if (result[0].address) {
+                  const addressInfo = result[0].address;
+                  let region1 = regionMap[addressInfo.region_1depth_name] || addressInfo.region_1depth_name;
+                  addr = region1;
+                  if (addressInfo.region_2depth_name) addr += " " + addressInfo.region_2depth_name;
+                  if (addressInfo.region_3depth_name) addr += " " + addressInfo.region_3depth_name;
+                  if (addressInfo.main_address_no) addr += " " + addressInfo.main_address_no;
+                  if (addressInfo.sub_address_no) addr += "-" + addressInfo.sub_address_no;
+              }
 
-                    // ✅ 도로명주소가 있으면 우선 사용
-                    if (result[0].road_address) {
-                        addr = result[0].road_address.address_name;
-                    }
-                    // 도로명주소 없으면 지번주소 사용
-                    else if (result[0].address) {
-                        const addressInfo = result[0].address;
+              // 🔹 HIDDEN INPUT 채우기 (백엔드 전송용)
+              document.getElementById('comLocationInput').value = addr;
 
-                        let region1 = regionMap[addressInfo.region_1depth_name] || addressInfo.region_1depth_name;
+              // 🔹 챗윈도우 내부 주소 입력창 업데이트 (사용자 확인용)
+              const addressInputInChat = document.getElementById('addressInputOnChat');
+              if (addressInputInChat) {
+                  addressInputInChat.value = addr;
+              }
 
-                        // 지번 주소 전체 조합
-                        addr = region1;
-                        if (addressInfo.region_2depth_name) addr += " " + addressInfo.region_2depth_name;
-                        if (addressInfo.region_3depth_name) addr += " " + addressInfo.region_3depth_name;
-                        if (addressInfo.main_address_no) addr += " " + addressInfo.main_address_no;
-                        if (addressInfo.sub_address_no) addr += "-" + addressInfo.sub_address_no;
-                    }
-
-                    // 🔹 기존 input 채우기
-                    const inputEl = document.getElementById('com_location') || document.getElementById('com_location_from_modal');
-                    if (inputEl && !inputEl.readOnly) {
-                        inputEl.value = addr;
-                    }
-
-
-                    // 🔹 새로 만든 주소 입력창에도 자동 입력
-                    const addressInput = document.getElementById('addressInput');
-                    if (addressInput) {
-                        addressInput.value = addr;
-                    }
-                }
-            });
-        }
-
-    }
+              // 🔹 (이전) 헤더 컨테이너의 주소 입력창도 업데이트 (만약 사용된다면)
+              const addressInputInHeader = document.getElementById('addressInput');
+              if (addressInputInHeader) {
+                  addressInputInHeader.value = addr;
+              }
+          }
+      });
+  }
+}
 
 // ---------------- 중심좌표 맞추기 ----------------
 function setDefaultCenter() {
@@ -443,6 +456,13 @@ let current_scenario = null;
 
 // ---------------- 시나리오 선택 ----------------
 function startScenario(scenarioId) {
+  // ✅ 핵심 수정: 시나리오 시작 시 주소 입력창(헤더의)은 숨기고,
+  // 지도와 주소 입력창을 chat-window 내에 메시지로 출력합니다.
+  const headerAddressInput = document.getElementById('addressInput');
+  if (headerAddressInput) {
+      headerAddressInput.style.display = 'none';
+  }
+
   current_scenario = scenarioId;
   let messages = [];
 
@@ -454,15 +474,16 @@ function startScenario(scenarioId) {
 
   if (scenarioId === 'trash_finder') {
     messages = [
-      '쓰레기통 찾기를 시작합니다.',
+      '안녕하세요. 쓰레기통 찾기를 시작합니다.',
       '아래 지도에서 현 위치를 확인하시고, 쓰레기통 아이콘을 눌러 길찾기를 할 수 있습니다.'
     ];
     // 💡 변경: 메시지 배열을 순회하며 개별적으로 출력
     messages.forEach(msg => {
         appendMessage('assistant', msg);
     });
+    // ✅ 지도/주소 로직을 chat-window 내 메시지로 출력
     loadKakaoSdk(() => {
-        appendMapMessage();
+        appendMapMessage(); // 지도와 주소 입력창이 포함된 메시지 버블을 추가
     });
 
   } else if (scenarioId === 'complain_submit') {
@@ -552,6 +573,11 @@ function uploadFile() {
   data.append('session_id', session_id || '');
   data.append('scenario_id', current_scenario || 'complain_submit');
 
+  // 주소 필드 추가
+  const comLocation = document.getElementById('comLocationInput').value;
+  data.append('com_location', comLocation);
+
+
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       pos => {
@@ -580,6 +606,11 @@ function sendTextMessage() {
   data.append('message', messageText);
   data.append('session_id', session_id || '');
   data.append('scenario_id', current_scenario || 'complain_submit');
+
+  // 주소 필드 추가
+  const comLocation = document.getElementById('comLocationInput').value;
+  data.append('com_location', comLocation);
+
 
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(

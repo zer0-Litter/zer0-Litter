@@ -30,9 +30,7 @@ html, body {
   flex-direction: column;
   max-width: 520px;
   width: 100%;
-
-  /* 🚨 최종 수정: 뷰포트 높이에서 하단 네비게이션바(약 4.5rem) 높이를 뺍니다. */
-  height: 660px;
+  height:660px; /* 이거 수정하지말라고 */
 
   border: none;
   border-radius: 0;
@@ -40,58 +38,48 @@ html, body {
   padding: 0;
   box-shadow: none;
   margin: 0 auto;
-  position: relative; /* 자식 absolute 기준이 됩니다. */
+  position: relative; /* chat-input의 absolute 기준이 됩니다. */
 }
 
 /* 상단 헤더 컨테이너 */
 .chat-header-container {
   display: flex;
   flex-direction: column;
-  /* 약 7rem (1.5rem + 1.5rem + 0.5rem + 0.5rem + 0.5rem) */
-  padding: 1.5rem 0.5rem;
+  /* 패딩을 조정하여 높이를 확보하고 스크롤 시 고정되도록 합니다. */
+  padding: 1.3rem 0.5rem 0.5rem 0.5rem; /* 상하좌우 패딩 조정 */
   box-sizing: border-box;
-  margin-left: 0.5rem;
-  margin-right: 0.5rem;
   margin-bottom: 0.5rem;
-  flex-shrink: 0;
+  flex-shrink: 0; /* 높이 고정 */
   position: sticky;
   top: 0;
   background-color: #f9f9f9;
-  border-radius: 30px;
+  border-radius: 0 0 10px 10px; /* 아래쪽만 둥글게 */
   z-index: 10;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* 경계선 구분을 위해 옅은 그림자 추가 */
 }
 
 .chatbot-main {
   display: flex;
   flex-direction: column;
   flex-grow: 1; /* 남은 공간을 모두 차지합니다. */
-  overflow: hidden;
-  padding-bottom: 0;
-  margin-bottom: 0rem;
-
+  overflow: hidden; /* 내부 요소가 넘치는 것을 방지 */
+  padding-bottom: 7rem; /* 🚨 핵심 수정: chat-input이 차지할 공간을 미리 확보 */
+  position: relative; /* chat-input의 absolute 컨테이너 역할을 합니다. */
 }
 
 /* chat-window: 대화 내용만 스크롤되도록 설정 */
 .chat-window {
-  /* 🚨 최종 수정: flex-grow 제거하고 calc()로 높이를 직접 계산하여 남는 공간을 모두 차지하게 합니다. */
-  flex-grow: 0;
-  /* Container Height (100% of chatbot-container)
-     - Header Height (약 7rem)
-     - Input Height (약 8rem)
-     = 100% - 15rem
-  */
-  height: calc(100% - 10rem);
+  /* 🚨 핵심 수정: 남은 공간을 모두 차지하도록 flex-grow 설정 */
+  flex-grow: 1;
+  /* flex-basis: 0; */ /* flex-grow와 함께 사용 시 유용 */
 
   border: none;
   border-radius: 0;
   padding: 0.5rem;
   overflow-y: auto;
   background-color: transparent;
-  margin-top: 0.5rem;
-
-  /* 🚨 최종 수정: 하단 여백 제거 (height로 공간을 계산했으므로 필요 없음) */
-  margin-bottom: 0;
-  padding-bottom: 0;
+  margin-top: 0;
+  padding-bottom: 0; /* 하단 여백은 main에서 처리 */
 
   scroll-behavior: smooth;
   font-family: 'Pretendard Variable', sans-serif;
@@ -131,6 +119,7 @@ html, body {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  flex: 1; /* 버튼이 동일한 너비를 가지도록 */
 }
 
 .scenario-btn svg {
@@ -140,7 +129,7 @@ html, body {
 }
 
 .scenario-btn:hover {
-  background-color: #F5F5F5;
+  background-color: #D0D0D0; /* 약간 어둡게 변경 */
 }
 
 .chat-message {
@@ -179,6 +168,15 @@ html, body {
   max-height: 100px;
   border-radius: 10px;
 }
+
+/* 지도와 주소 입력창이 들어가는 메시지 버블 스타일 */
+.chat-message.assistant.map-message .message-bubble {
+    padding: 0; /* 내부 요소가 패딩을 직접 갖도록 조정 */
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100vh; /* 지도 크기를 위해 확장 */
+}
+
 
 /* chat-input: 인풋창의 선을 제거하고 크기를 조절합니다. */
 .chat-input {
@@ -228,7 +226,7 @@ html, body {
 /* 버튼들을 감싸는 컨테이너 */
 .chat-input .input-buttons {
     display: flex;
-    align-items: center;
+    align-items: flex-end; /* 버튼을 하단에 정렬 */
     gap: 0.5rem;
     flex-shrink: 0;
 }
@@ -238,6 +236,7 @@ html, body {
     cursor: pointer;
     color: #555;
     flex-shrink: 0;
+    padding-bottom: 0.2rem; /* 전송 버튼과 높이를 맞추기 위해 */
 }
 
 /* 전송 버튼 (SVG 포함) */
@@ -249,8 +248,8 @@ html, body {
     border-radius: 50%;
     background-color: #142c47;
     color: white;
-    width: 2.5rem;
-    height: 2.5rem;
+    width: 2.2rem; /* 크기 약간 축소 */
+    height: 2.2rem; /* 크기 약간 축소 */
     cursor: pointer;
     padding: 0;
     flex-shrink: 0;
@@ -263,8 +262,8 @@ html, body {
 
 /* SVG 아이콘 스타일 */
 .chat-input button[type="submit"] svg {
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 1.3rem; /* 크기 약간 축소 */
+    height: 1.3rem; /* 크기 약간 축소 */
     stroke: white;
 }
 
@@ -277,7 +276,7 @@ html, body {
 /* 이전 민원 모달일 때 기본 모달 버튼 숨기기 */
 #modal-message:has(.prevc-wrap) + .modal-buttons { display: none; }
 
-/* 모달 스타일 개선 */
+/* 모달 스타일 개선 (변동 없음) */
 #trashDetailModal {
   position: fixed;
   z-index: 99999;
@@ -292,9 +291,9 @@ html, body {
 .modal-content {
   background: #fff;
   width: 90%;
-  max-width: 320px;   /* 최대 크기 제한 */
-  max-height: 80vh;   /* 화면 높이의 80%를 넘지 않도록 */
-  overflow-y: auto;   /* 내용 많으면 스크롤 */
+  max-width: 320px;
+  max-height: 80vh;
+  overflow-y: auto;
   border-radius: 10px;
   font-family: sans-serif;
   position: relative;
@@ -313,7 +312,7 @@ html, body {
 
 .trash-image img {
   width: 100%;
-  height: 150px;        /* 이미지 높이 줄임 */
+  height: 150px;
   object-fit: cover;
   border-top-left-radius: 10px;
   border-top-right-radius: 10px;
@@ -371,11 +370,11 @@ html, body {
     left: 50%;
     width: 30px;
     height: 35px;
-    margin-left: -15px;  /* 중앙 보정 */
-    margin-top: -35px;   /* 핀 끝이 좌표 찍게 보정 */
+    margin-left: -15px;
+    margin-top: -35px;
     background: url('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png') no-repeat center;
     background-size: contain;
-    pointer-events: none; /* 드래그 방해 안 하도록 */
+    pointer-events: none;
     z-index: 1000;
 }
 
@@ -385,6 +384,7 @@ html, body {
   gap: 10px; /* 버튼 사이 간격 */
 }
 
+/* 🚨 수정: 지도 아래에 위치할 address-input 스타일 */
 .address-input {
   width: 100%;
   padding: 10px 14px;
@@ -394,6 +394,9 @@ html, body {
   outline: none;
   box-sizing: border-box;
   color: #333;
+  /* margin-top: 0.5rem; -> JS에서 추가함 */
+  background-color: white; /* 읽기 전용 느낌 강조 */
+  cursor: default; /* 읽기 전용임을 표시 */
 }
 
 .address-input::placeholder {

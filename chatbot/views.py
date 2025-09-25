@@ -2,6 +2,8 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
+
+from trash_loc.views import haversine
 from .chatbot_core import chatbot_router
 from common.models_mongo import ChatHistory, Counter, ChatFiles, Complaints
 from datetime import datetime
