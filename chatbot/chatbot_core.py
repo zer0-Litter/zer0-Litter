@@ -309,15 +309,20 @@ def handle_complain_submit(user_input, username, session_id, chat_history):
         return {"response": llm_output, "com_type": com_types, "is_final": is_final}
 
 
-# 💡 [수정] handle_trash_finder 함수: 주변 쓰레기통 유무 확인 로직 추가 및 인자 추가
+
+# 💡 [최종 수정] handle_trash_finder 함수: 위치 기반 조회를 최우선으로 실행
 def handle_trash_finder(user_input, username, session_id, com_location=None):
     """쓰레기통 위치 안내 시나리오를 처리하고 라우터에 결과를 반환합니다."""
 
+    # 💡 1. '위치확인_주소:' 메시지 처리 (첫 번째 요청)
+    # 뷰에서 이 메시지를 받을 때 lat/lon을 ChatHistory에 저장한다고 가정
+    if user_input.startswith("위치확인_주소:"):
+        return {"response": "위치 확인했습니다. 무엇을 도와드릴까요?", "is_final": False}
+
     user_lat, user_lon = None, None
 
-    # 1. 현 위치 (위도/경도) 가져오기: temp_com_location을 바탕으로 ChatHistory에서 조회 (가장 최근)
-    # 💡 [핵심] com_location이 전달되었더라도, 실제 위치(lat/lon)는 ChatHistory에서 가져와야 함.
-    #    (views.py에서 위치 확인 시 lat/lon을 ChatHistory에 저장한다고 가정)
+    # 💡 2. 현 위치 (위도/경도) 가져오기: ChatHistory에서 조회 (가장 최근)
+    # 'user' 역할이며 'latitude' 필드가 존재하는 가장 최근 문서를 찾음
     location_doc = COLLECTIONS["history"].find_one(
         {"session_id": session_id, "role": "user", "latitude": {"$exists": True, "$ne": None}},
         sort=[("created_at", -1)]
@@ -325,29 +330,42 @@ def handle_trash_finder(user_input, username, session_id, com_location=None):
 
     if location_doc and location_doc.get("latitude") and location_doc.get("longitude"):
         try:
-            user_lat = float(location_doc["latitude"])
-            user_lon = float(location_doc["longitude"])
-        except (ValueError, TypeError):
+            # MongoDB에서 가져온 위도/경도 값이 None이거나 빈 문자열이 아닌지 최종 확인 후 float으로 변환
+            lat_val = location_doc["latitude"]
+            lon_val = location_doc["longitude"]
+
+            if lat_val is not None and lon_val is not None:
+                user_lat = float(lat_val)
+                user_lon = float(lon_val)
+        except (ValueError, TypeError) as e:
+            logger.error(f"ChatHistory에서 위도/경도 변환 실패: {e}", exc_info=True)
             user_lat, user_lon = None, None
 
-    # 2. 위치 정보가 있을 경우에만 쓰레기통 조회 로직 실행
+    # 3. [핵심 로직] 위치 정보가 있을 경우, 사용자의 질문에 관계없이 쓰레기통 조회 로직을 실행
     if user_lat is not None and user_lon is not None and TrashLoc:
 
-        # 3. 쓰레기통 데이터 조회 및 거리 계산
+        # 4. 쓰레기통 데이터 조회 및 거리 계산
+        # 💡 [추가] 가장 가까운 쓰레기통 정보를 저장할 변수 초기화
+        min_distance_m = float('inf')
+        nearest_trashcan_address = None
+
         nearby_counts = {100: 0, 200: 0, 300: 0}  # 미터
         try:
-            # 💡 [Django Model 사용 가정] TrashLoc.objects.all()로 모든 쓰레기통 조회
             all_trashcans = TrashLoc.objects.all()
 
             for t in all_trashcans:
-                # DB의 lat, lon이 DecimalField이므로, float으로 변환
                 if t.t_lat and t.t_lon:
                     t_lat = float(t.t_lat)
                     t_lon = float(t.t_lon)
 
                     distance_m = haversine(user_lat, user_lon, t_lat, t_lon)
 
-                    # 300m 이내만 계산 (최대 범위)
+                    # 💡 [추가] 가장 가까운 쓰레기통 업데이트 로직
+                    if distance_m < min_distance_m:
+                        min_distance_m = distance_m
+                        # t.t_addr 또는 t.t_road_addr 중 하나를 사용한다고 가정합니다. (t_addr 사용)
+                        nearest_trashcan_address = getattr(t, 't_addr', getattr(t, 't_road_addr', '알 수 없는 주소'))
+
                     if distance_m <= 300:
                         if distance_m <= 100:
                             nearby_counts[100] += 1
@@ -356,35 +374,65 @@ def handle_trash_finder(user_input, username, session_id, com_location=None):
                         if distance_m <= 300:
                             nearby_counts[300] += 1
 
-            # 4. 응답 생성
-            response_parts = []
+            # 5. 응답 생성
+            response = ""
 
-            # 100m 이내 개수 확인
-            if nearby_counts[100] > 0:
-                response_parts.append(f"현재 위치 주변 100m 이내에 쓰레기통 {nearby_counts[100]}개가 있습니다.")
+            # 💡 [추가] 사용자 질문의 의도 파악: 특정 위치를 원하는지 확인
+            proximity_keywords = ["가까운", "어딨어", "위치", "주소", "어디"]
+            is_specific_location_query = any(keyword in user_input for keyword in proximity_keywords)
+
+            # 300m 이내에 쓰레기통이 없는 경우
+            if min_distance_m > 300 or nearest_trashcan_address is None:
+                response = "300m 이내에는 쓰레기통이 없는 것 같아요. 다른 곳을 찾아보시겠어요?"
+
+            # 💡 [핵심 수정] 사용자 질문이 구체적인 위치 요구일 때 (e.g., "가장 가까운게 어딨어?")
+            elif is_specific_location_query:
+
+                distance_str = f"{min_distance_m:.1f}m"
+                if min_distance_m >= 1000:
+                    distance_str = f"{min_distance_m / 1000:.2f}km"
+
+                # 가장 가까운 쓰레기통 주소와 지도 확인 메시지를 반환
+                response = (
+                    f"가장 가까운 쓰레기통은 현재 위치에서 약 **{distance_str}** 거리에 있습니다. "
+                    f"주소는 **{nearest_trashcan_address}** 입니다. "
+                    f"더 자세한 위치는 위의 지도를 통해 바로 확인하실 수 있습니다."
+                )
+
             else:
-                response_parts.append("현재 위치 주변 100m 이내에는 쓰레기통이 없습니다.")
+                # 사용자가 일반적인 개수나 존재 여부를 묻는 경우 ("근처에 쓰레기통 있어?")
+                response_parts = []
 
-            # 200m 이내 추가 확인 (100m 초과 ~ 200m 이내)
-            if nearby_counts[200] > nearby_counts[100]:
-                response_parts.append(f"200m 이내로 범위를 넓히면 총 {nearby_counts[200]}개의 쓰레기통이 있습니다.")
+                if nearby_counts[100] > 0:
+                    response_parts.append(f"현재 위치 주변 100m 이내에 쓰레기통 **{nearby_counts[100]}개**가 있습니다.")
+                else:
+                    if nearby_counts[300] > 0:
+                        response_parts.append(
+                            f"현재 위치 주변 100m 이내에는 쓰레기통이 없으나, 300m 이내에는 총 **{nearby_counts[300]}개**의 쓰레기통이 있습니다.")
+                    else:
+                        response_parts.append("300m 이내에는 쓰레기통이 없는 것 같아요. 다른 곳을 찾아보시겠어요?")
 
-            # 300m 이내 추가 확인 (200m 초과 ~ 300m 이내)
-            if nearby_counts[300] > nearby_counts[200]:
-                response_parts.append(f"300m 이내로 범위를 넓히면 총 {nearby_counts[300]}개의 쓰레기통이 있습니다.")
+                # 일반 질문에도 가장 가까운 거리를 괄호로 추가
+                if min_distance_m <= 300 and min_distance_m != float('inf'):
+                    distance_str = f"{min_distance_m:.1f}m"
+                    response_parts.append(f"(가장 가까운 쓰레기통은 {distance_str} 거리에 있습니다.)")
 
-            if nearby_counts[300] == 0 and nearby_counts[100] == 0:
-                response_parts.append("300m 이내에는 쓰레기통이 없는 것 같아요. 다른 곳을 찾아보시겠어요?")
+                response = " ".join(response_parts)
 
-            # LLM 체인을 타지 않고, 위치 정보 기반으로 직접 생성한 응답을 반환
-            return {"response": " ".join(response_parts), "is_final": False}
+            # 위치 정보 기반으로 직접 생성한 응답을 반환
+            return {"response": response, "is_final": False}
 
         except Exception as e:
-            logger.error(f"쓰레기통 위치 조회 중 오류 발생: {e}", exc_info=True)
-            # 오류 발생 시, 일반적인 챗봇 응답으로 대체
-            pass  # 아래 기존 LLM 호출 로직으로 이동
+            logger.error(f"쓰레기통 위치 조회 중 오류 발생 (DB/계산): {e}", exc_info=True)
+            # 조회 중 DB/계산 오류 발생 시, 아래 LLM 호출 로직으로 이동하여 일반 응답을 시도
+            pass
 
-    # 5. 위치 정보가 없거나, 조회 중 오류가 발생했거나, 기타 일반적인 'trash_finder' 질문일 경우 LLM 호출 (기존 로직)
+    # 6. [위치 정보 부족 처리] user_lat/lon이 None인 경우
+    if user_lat is None or user_lon is None:
+        # 이 응답은 LLM을 거치지 않으므로, 챗봇이 위치를 모를 때 항상 이 응답이 나감
+        return {"response": "현재 위치 정보를 알 수 없어 정확한 안내가 어렵습니다. '위치확인_주소:주소' 형태로 알려주세요.", "is_final": False}
+
+    # 7. [Fallback LLM 호출] 위치 정보는 있지만, 쓰레기통 조회가 실패했거나, 복잡한 질문일 경우
     response = trash_chain.invoke({"user_input": user_input})
     final_response = truncate_to_full_sentence(response.content)
     return {"response": final_response, "is_final": False}
