@@ -56,7 +56,7 @@
   border: 1.5px solid #d0e8ff;
   border-radius: 10px;
   padding: 10px 12px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   background-color: #fff;
   cursor: pointer;
   transition: background 0.2s, transform 0.1s;
@@ -110,7 +110,8 @@
 .no-bin {
   font-size: 13px;
   color: #777;
-  margin-bottom: 6px;
+  margin-top: 20px;
+  margin-bottom: 20px;
   text-align: center;
 }
 
