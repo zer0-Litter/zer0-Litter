@@ -13,9 +13,10 @@
 
   <ul class="latest-feed">
     {% for it in latest_complaints %}
+      {% with icon_path='img/icon_'|add:it.icon_type|add:'.png' %}
       <li class="latest-row">
         <div class="left">
-          <img class="icon" src="{% static 'img/trashcan.png' %}" alt="trash">
+          <img class="icon" src="{% static icon_path %}" alt="{{ it.type_label }}">
           <div class="meta">
             <div class="region">{{ it.region }}</div>
             <div class="type">{{ it.type_label }}</div>
@@ -23,10 +24,12 @@
         </div>
         <div class="right time">{{ it.timeago }}</div>
       </li>
+      {% endwith %}
     {% empty %}
       <li class="latest-row empty">표시할 최신 민원이 없습니다.</li>
     {% endfor %}
   </ul>
+
 </section>
 
 <section class="map-card">
