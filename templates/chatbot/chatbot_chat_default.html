@@ -231,7 +231,7 @@ function appendMapMessage() {
       const currentAddress = document.getElementById('addressInputOnChat').value;
       if (currentAddress && currentAddress !== '마커를 움직여 현 위치를 선택해주세요') {
           // 챗봇 대화창에 사용자 메시지 출력
-          appendMessage('user', `${currentAddress} 여기시군요.`);
+          appendMessage('user', `현재 ${currentAddress} 에 있어.`);
 
           // 사용자가 확인했으므로 버튼 비활성화 (선택 사항)
           confirmButton.disabled = true;
@@ -512,8 +512,8 @@ function startScenario(scenarioId) {
 
   if (scenarioId === 'trash_finder') {
     messages = [
-      '아래 지도에서 현 위치를 확인하시고,',
-      '쓰레기통 아이콘을 눌러 길찾기를 할 수 있습니다.'
+      '지도에서 현 위치를 확인하고,',
+      '쓰레기통을 눌러서 길을 찾을 수 있어요.'
     ];
     // 💡 변경: 메시지 배열을 순회하며 개별적으로 출력
     messages.forEach(msg => {
@@ -526,12 +526,16 @@ function startScenario(scenarioId) {
 
   } else if (scenarioId === 'complain_submit') {
     messages = [
-      '민원 제보를 시작하겠습니다.',
-      '어떤 것을 도와드릴까요?'
+      '지도에서 현재 위치가 맞으면 확인을 눌러주세요.',
+      '아니면 마커를 움직여서 현 위치를 확인해주세요.'
     ];
     // 💡 변경: 메시지 배열을 순회하며 개별적으로 출력
     messages.forEach(msg => {
         appendMessage('assistant', msg);
+    });
+    // ✅ 지도/주소 로직을 chat-window 내 메시지로 출력
+    loadKakaoSdk(() => {
+        appendMapMessage(); // 지도와 주소 입력창이 포함된 메시지 버블을 추가
     });
   } else {
     // 💡 변경: 단일 메시지도 appendMessage를 직접 호출하도록 변경

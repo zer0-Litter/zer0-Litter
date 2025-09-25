@@ -204,14 +204,15 @@ html, body {
   border: 1px solid #ccc;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   padding: 1rem;
+  margin-top: 10px;
 }
 
 /* 텍스트 입력 영역 */
 .chat-input textarea {
   flex-grow: 1;
   /* 🚨 최종 수정: 입력창 높이를 더 크게 (예: 6rem) */
-  min-height: 6rem;
-  max-height: 6rem;
+  min-height: 5rem;
+  max-height: 5rem;
 
   border: none;
   outline: none;
