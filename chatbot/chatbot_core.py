@@ -434,14 +434,12 @@ def handle_trash_finder(user_input, username, session_id, com_location=None):
 # --- 메인 라우터 함수: 전체 대화의 흐름 제어 ---
 def chatbot_router(user_input, username, session_id=None, scenario_id=None, temp_com_location=None,
                    reset_session=False):
-    """
-    사용자 입력에 따라 적절한 챗봇 시나리오를 라우팅합니다.
-    """
+    # (1~5번 블록: 이전과 동일. 흐름 제어 로직은 이제 안정적임)
 
-    # 1. 시나리오 시작 요청 (버튼 클릭)을 가장 먼저 처리 (reset_session=True가 넘어온 경우)
+    # 1. 시나리오 시작 요청 (버튼 클릭)을 가장 먼저 처리
     if reset_session and scenario_id in ("complain_submit", "trash_finder"):
         session_id = generate_session_id()
-        temp_com_location = None  # 주소 데이터 강제 초기화
+        temp_com_location = None
 
         if scenario_id == "trash_finder":
             return {
@@ -465,14 +463,11 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None, temp
         session_id = generate_session_id()
         scenario_id = "default"
 
-    # 💡 [핵심 수정: 클라이언트 오류 방어] 주소 정보가 없는 경우 (초기 상태)
-    #    scenario_id가 complain_submit이나 trash_finder로 넘어왔더라도 무조건 default로 강제합니다.
+    # 주소 정보가 없는 경우 (초기 상태) scenario_id가 무엇이든 무조건 default로 강제합니다.
     if not temp_com_location:
         scenario_id = "default"
 
-    # ---
-    # 3. 위치 확인 메시지 패턴을 확인하고 즉시 응답 반환 (가장 높은 우선순위)
-    # 💡 [scenario_id가 default일 때는 4번 블록으로 넘어가 제약 조건 메시지를 따르도록 합니다.]
+    # 3. 위치 확인 메시지 패턴을 확인하고 즉시 응답 반환
     if user_input.startswith("위치확인_주소:") and scenario_id != "default":
         location_address = user_input.replace("위치확인_주소:", "").strip()
 
@@ -489,7 +484,6 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None, temp
             "temp_com_location": current_temp_com_location
         }
 
-    # ---
     # 4. 채팅 기록 불러오기 및 강력한 제약 조건 (default 시나리오 강제 차단)
     chat_history = get_chat_history_from_db(session_id)
     CONSTRAINT_MESSAGE_START = "먼저 **'쓰레기통 위치 찾기'** 또는 **'민원 접수하기'**"
@@ -504,12 +498,9 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None, temp
         if last_assistant_message and last_assistant_message.startswith(CONSTRAINT_MESSAGE_START):
             is_previous_constraint = True
 
-    # 💡 [temp_com_location이 있다는 것은 시나리오가 이미 진행 중이었음을 의미하므로,
-    #    default 차단 로직을 회피하고 'complain_submit'으로 강제 복원합니다.]
     if scenario_id == "default" and temp_com_location:
         scenario_id = "complain_submit"
 
-    # default 차단 조건: 시나리오가 default이고, (2번 블록에서 강제됨) temp_com_location이 없거나, 이전 제약 조건 메시지가 있었을 때
     if scenario_id == "default" and (not temp_com_location or is_previous_constraint):
         return {
             "response": CONSTRAINT_MESSAGE_START + " 버튼을 클릭하여 시나리오를 선택해 주세요.",
@@ -518,11 +509,9 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None, temp
             "scenario_id": "default"
         }
 
-    # ---
     # 5. 시나리오 ID 결정, 위치 정보 강제, 일반 질문 차단 로직
     target_scenario_id = scenario_id
 
-    # 민원 시나리오 시작 후 위치가 확인되지 않았을 때의 강제 응답 (이 로직은 2번 블록에서 이미 차단되었지만 안전을 위해 유지)
     if target_scenario_id == "complain_submit" and not temp_com_location:
         return {
             "response": "민원 접수를 시작합니다. 민원 발생 위치(주소)를 먼저 입력해 주세요. (예: 서울특별시 중구 태평로1가 31)",
@@ -531,7 +520,6 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None, temp
             "scenario_id": "complain_submit"
         }
 
-    # 유효하지 않은 시나리오 ID가 들어왔을 때 일반 질문 차단 (2개 시나리오 이외)
     if target_scenario_id not in ("complain_submit", "trash_finder"):
         return {
             "response": "죄송합니다. 저는 **쓰레기 관련 민원 접수**나 **쓰레기통 위치 찾기**만 전문적으로 도와드릴 수 있어요. 어떤 도움을 드릴까요?",
@@ -543,11 +531,31 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None, temp
     scenario_id = target_scenario_id
 
     # ---
-    # 6. 시나리오별 처리 (각 시나리오별 적절한 응답)
+    # 6. 시나리오별 처리
     if scenario_id == "complain_submit":
         result = handle_complain_submit(user_input, username, session_id, chat_history, temp_com_location)
-        if 'com_type' not in result or result['com_type'] is None:
+
+        # 💡 [핵심 수정: com_type 누락 시 임시 방어 로직]
+        # 최종 응답이며 com_type이 빈 리스트일 경우, summary에서 키워드를 추출하여 강제 주입합니다.
+        if result.get('is_final') == True and (not result.get('com_type') or result['com_type'] == []):
+            summary = result.get('summary', '').lower()
+
+            # 키워드 기반 추정 (핸들러의 오작동을 가정하고 우회함)
+            inferred_types = []
+            if '청소' in summary or '쌓여서' in summary or '쓰레기' in summary:
+                inferred_types.append('청소')
+            if '쓰레기통' in summary or '추가' in summary or '신설' in summary:
+                inferred_types.append('쓰레기통추가')
+
+            # 최종적으로 추정된 타입이 있으면 주입합니다.
+            if inferred_types:
+                result['com_type'] = list(set(inferred_types))  # 중복 제거
+            elif not result.get('com_type'):
+                result['com_type'] = []  # 여전히 없으면 빈 리스트 유지
+
+        elif not result.get('com_type'):
             result['com_type'] = []
+
         result["session_id"] = session_id
         if result.get("is_final", False) == True:
             result["scenario_id"] = "default"
@@ -555,7 +563,6 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None, temp
         return result
 
     elif scenario_id == "trash_finder":
-        # 쓰레기통 찾기 시나리오 시작 후 위치가 확인되지 않았을 때의 강제 응답 (이 로직은 2번 블록에서 이미 차단되었지만 안전을 위해 유지)
         if not temp_com_location:
             return {
                 "response": "쓰레기통 위치를 찾기 위해 먼저 **정확한 위치(주소)**를 입력해 주세요.",
@@ -564,7 +571,6 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None, temp
                 "scenario_id": "trash_finder"
             }
 
-        # 쓰레기통 관련 질문인지 확인하는 로직 (질문이 부적절할 경우 차단)
         trash_keywords = ["쓰레기통", "근처", "가까운", "어디", "찾아", "있어"]
         is_relevant_query = any(keyword in user_input for keyword in trash_keywords)
         if not is_relevant_query:
@@ -582,4 +588,4 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None, temp
 
     else:
         response = "지원하지 않는 질문입니다."
-        return {"response": response, "session_id": session_id, "is_final": False}#
+        return {"response": response, "session_id": session_id, "is_final": False}
