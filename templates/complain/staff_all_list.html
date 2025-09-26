@@ -18,6 +18,7 @@
     <input type="text" id="daterange_display" class="daterange-display" placeholder="기간 선택 (연도-월-일 ~ 연도-월-일)" readonly>
     <input type="date" name="from" id="date_from" value="{{ query.from|default:'' }}" hidden>
     <input type="date" name="to"   id="date_to"   value="{{ query.to|default:'' }}"   hidden>
+
     <div id="daterange_popover" class="daterange-popover" hidden>
       <div class="row">
         <input type="date" id="dr_from">
@@ -46,7 +47,12 @@
 <ul class="complaint-list">
   {% for it in page_obj %}
   {% with c=it.doc last=it.last %}
-  <li class="complaint-item">
+  <li class="complaint-item"
+      data-com-id="{{ c.com_id }}"
+      data-type="{{ c.com_type }}"
+      data-date="{{ c.com_reg_date|date:'Y-m-d H:i' }}"
+      data-location="{{ c.com_location|cut:'서울특별시'|cut:'서울시' }}"
+      data-content="{{ c.com_contents|default:'' }}">
     <div class="complaint-title">
       <div>
         <b>#{{ c.com_id }}</b>
@@ -68,7 +74,6 @@
       </div>
     </div>
 
-    {# ← complaint-meta 밖, 카드 오른쪽 열 #}
     <div class="complaint-status">
       {% if last and last.status_name == '처리완료' %}
         <span class="badge status-done">처리완료</span>
@@ -103,8 +108,6 @@
 {% if page_obj.paginator.num_pages > 1 %}
 <div class="pagination">
   {% with qv=query.q|default:''|urlencode sv=query.status|default:''|urlencode fv=query.from|default:''|urlencode tv=query.to|default:''|urlencode %}
-
-    {# 맨앞 / 이전 #}
     {% if page_obj.has_previous %}
       <a class="page-link icon-btn first" href="?page=1&q={{ qv }}&status={{ sv }}&from={{ fv }}&to={{ tv }}" aria-label="맨앞">
         <svg class="ico"><use href="#chev-left"/></svg>
@@ -123,18 +126,14 @@
       </span>
     {% endif %}
 
-    {# 항상 5개 고정 범위 출력 #}
     {% for num in page_range %}
       {% if num == page_obj.number %}
         <span class="page-link current">{{ num }}</span>
       {% else %}
-        <a class="page-link"
-           href="?page={{ num }}&q={{ qv }}&status={{ sv }}&from={{ fv }}&to={{ tv }}">{{ num }}</a>
+        <a class="page-link" href="?page={{ num }}&q={{ qv }}&status={{ sv }}&from={{ fv }}&to={{ tv }}">{{ num }}</a>
       {% endif %}
     {% endfor %}
 
-
-    {# 다음 / 맨뒤 #}
     {% if page_obj.has_next %}
       <a class="page-link icon-btn next" href="?page={{ page_obj.next_page_number }}&q={{ qv }}&status={{ sv }}&from={{ fv }}&to={{ tv }}" aria-label="다음">
         <svg class="ico"><use href="#chev-right"/></svg>
@@ -152,79 +151,120 @@
         <svg class="ico second"><use href="#chev-right"/></svg>
       </span>
     {% endif %}
-
   {% endwith %}
 </div>
 {% endif %}
 
+{% endblock %}
 
 
-
-
-
+{% block extra_script %}
 <script>
-(function(){
-  /* --- 완료 후 성공 모달 --- */
-  (function showUpdatedModalIfNeeded(){
-    try {
-      const url = new URL(window.location.href);
-      if (url.searchParams.get('updated') === '1') {
-        if (typeof showModal === 'function') {
-          showModal('변경되었습니다.', { confirmText: '확인', showCancel: false });
-        } else {
-          alert('변경되었습니다.');
-        }
-        // 주소창에서 updated 파라미터 제거
-        url.searchParams.delete('updated');
-        history.replaceState(null, '', url.pathname + (url.searchParams.toString() ? '?' + url.searchParams.toString() : ''));
-      }
-    } catch(e) {}
-  })();
-
-  const display = document.getElementById('daterange_display');
-  const pop     = document.getElementById('daterange_popover');
-  const hFrom   = document.getElementById('date_from');
-  const hTo     = document.getElementById('date_to');
-  const drFrom  = document.getElementById('dr_from');
-  const drTo    = document.getElementById('dr_to');
-  const btnApply= document.getElementById('dr_apply');
-  const btnClear= document.getElementById('dr_clear');
-
-  function fmt(a,b){ if(a&&b)return `${a} ~ ${b}`; if(a)return `${a} ~ `; if(b)return ` ~ ${b}`; return ''; }
-  function openPopover(){ drFrom.value=hFrom.value||''; drTo.value=hTo.value||''; pop.hidden=false; }
-  function closePopover(){ pop.hidden=true; }
-  function apply(){ let a=drFrom.value,b=drTo.value; if(a&&b&&a>b){const t=a;a=b;b=t;} hFrom.value=a||''; hTo.value=b||''; display.value=fmt(hFrom.value,hTo.value); closePopover(); }
-  function clearAll(){ drFrom.value='';drTo.value='';hFrom.value='';hTo.value='';display.value='';closePopover(); }
-  display.value=fmt(hFrom.value,hTo.value);
-  display.addEventListener('click', (e)=>{ e.stopPropagation(); openPopover(); });
-  document.addEventListener('click', (e)=>{ if(!pop.hidden && !pop.contains(e.target) && e.target!==display) closePopover(); });
-  btnApply.addEventListener('click', apply);
-  btnClear.addEventListener('click', clearAll);
-  drFrom.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); apply(); }});
-  drTo  .addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); apply(); }});
-
-  // --- '처리중' 클릭 → 모달 확인 → 완료 처리
-  function confirmAndSubmit(formId){
-    const form = document.getElementById(formId);
-    if(!form) return;
-    // nav_base의 공통 모달 사용 (확인/취소)
-    if (typeof showModal === 'function') {
-      showModal('처리완료로 변경하시겠습니까?', {
-        confirmText:'예', cancelText:'아니오', showCancel:true,
-        onConfirm: ()=> form.submit()
-      });
-    } else {
-      if (confirm('처리완료로 변경하시겠습니까?')) form.submit();
+(function () {
+  /* 업데이트 완료 모달 */
+  function showUpdatedModalIfNeeded() {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('updated') === '1') {
+      window.showModal('변경되었습니다.', { confirmText: '확인', showCancel: false });
+      url.searchParams.delete('updated');
+      history.replaceState(null, '', url.pathname + (url.searchParams.toString() ? '?' + url.searchParams.toString() : ''));
     }
   }
 
-  document.querySelectorAll('.js-mark-complete').forEach(btn=>{
-    btn.addEventListener('click', ()=> confirmAndSubmit(btn.dataset.formId));
+  /* 처리중 → 확인 모달 → 완료 처리 */
+  function bindMarkComplete() {
+    document.addEventListener('click', function(e) {
+      const btn = e.target.closest('.js-mark-complete');
+      if (!btn) return;
+      e.preventDefault();
+      const form = document.getElementById(btn.dataset.formId);
+      if (!form) return;
+
+      if (typeof window.showModal === 'function') {
+        window.showModal('처리완료로 변경하시겠습니까?', {
+          confirmText: '예', cancelText: '아니오', showCancel: true,
+          onConfirm: function () { form.submit(); }
+        });
+      } else {
+        if (confirm('처리완료로 변경하시겠습니까?')) form.submit();
+      }
+    });
+  }
+
+  /* 날짜 팝오버 (포털 방식, 요소 없으면 스킵) */
+  function initDatePopover() {
+    const display = document.getElementById('daterange_display');
+    const pop     = document.getElementById('daterange_popover');
+    const hFrom   = document.getElementById('date_from');
+    const hTo     = document.getElementById('date_to');
+    const drFrom  = document.getElementById('dr_from');
+    const drTo    = document.getElementById('dr_to');
+    const btnApply= document.getElementById('dr_apply');
+    const btnClear= document.getElementById('dr_clear');
+    if (!display || !pop || !hFrom || !hTo || !drFrom || !drTo || !btnApply || !btnClear) return;
+
+    function fmt(a,b){ if(a&&b)return `${a} ~ ${b}`; if(a)return `${a} ~ `; if(b)return ` ~ ${b}`; return ''; }
+    function closePopover(){
+      pop.hidden = true;
+      if (pop.__originParent) {
+        pop.classList.remove('is-fixed');
+        pop.style.left = '';
+        pop.style.top  = '';
+        pop.style.width = '';
+        pop.__originParent.appendChild(pop);
+        pop.__originParent = null;
+      }
+    }
+    function openPopover(){
+      drFrom.value = hFrom.value || '';
+      drTo.value   = hTo.value   || '';
+
+      if (!pop.__originParent) pop.__originParent = pop.parentElement;
+      document.body.appendChild(pop);
+      pop.hidden = false;
+      pop.classList.add('is-fixed');
+
+      const r = display.getBoundingClientRect();
+      const vw = window.innerWidth, vh = window.innerHeight;
+
+      let left = Math.round(r.left);
+      let top  = Math.round(r.bottom + 6);
+
+      const popW = Math.max(270, pop.offsetWidth || 270);
+      const popH = pop.offsetHeight || 160;
+      if (left + popW > vw - 8) left = Math.max(8, vw - popW - 8);
+      if (top  + popH > vh - 8) top  = Math.max(8, r.top - popH - 6);
+
+      pop.style.left = left + 'px';
+      pop.style.top  = top  + 'px';
+      if (popW > vw - 16) pop.style.width = (vw - 16) + 'px';
+    }
+    function apply(){
+      let a = drFrom.value, b = drTo.value;
+      if (a && b && a > b) { const t=a; a=b; b=t; }
+      hFrom.value = a || '';
+      hTo.value   = b || '';
+      display.value = fmt(hFrom.value, hTo.value);
+      closePopover();
+    }
+    function clearAll(){ drFrom.value=''; drTo.value=''; hFrom.value=''; hTo.value=''; display.value=''; closePopover(); }
+
+    display.value = fmt(hFrom.value, hTo.value);
+    display.addEventListener('click', (e)=>{ e.stopPropagation(); openPopover(); });
+    document.addEventListener('click', (e)=>{ if (!pop.hidden && !pop.contains(e.target) && e.target !== display) closePopover(); });
+    btnApply.addEventListener('click', apply);
+    btnClear.addEventListener('click', clearAll);
+    drFrom.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); apply(); }});
+    drTo  .addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); apply(); }});
+    window.addEventListener('resize', closePopover);
+    window.addEventListener('scroll', closePopover, { passive:true });
+  }
+
+  window.addEventListener('DOMContentLoaded', function(){
+    showUpdatedModalIfNeeded();
+    bindMarkComplete();
+    initDatePopover();
   });
 })();
 </script>
 {% endblock %}
-
-
-
-
