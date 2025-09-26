@@ -86,13 +86,27 @@ html, body {
 }
 
 /* 초기 인사말 스타일 */
-.initial-greeting {
-  text-align: center;
-  margin-top: 0;
-  margin-bottom: 0.8rem;
+.initial-greeting-inline {
+  display: flex;
+  align-items: center; /* 아이콘과 글씨 세로 정렬 */
+  justify-content: center;
+  gap: 6px; /* 글씨와 아이콘 사이 간격 */
   font-size: 1.1rem;
-  color: #555;
   font-weight: bold;
+  color: #555;
+  margin-bottom: 0.3rem;
+}
+
+.greeting-icon-inline {
+  width: 24px;   /* 아이콘 크기 조정 */
+  height: 24px;
+  vertical-align: middle;
+}
+
+.initial-subtext {
+  text-align: center;
+  font-size: 0.95rem;
+  color: #666;
 }
 
 .scenario-buttons-fixed {
