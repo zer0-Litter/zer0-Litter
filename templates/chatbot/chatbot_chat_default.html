@@ -12,10 +12,14 @@
 {% block content %}
 <div class="chatbot-container">
     <div class="chat-header-container">
-      <div class="initial-greeting">
-        <span>안녕하세요, AI 오엘입니다!</span> <br>
-        <span>도움이 필요한 버튼을 눌러주세요.</span>
+      <div class="initial-greeting-inline">
+        <span>안녕하세요,</span>
+        <img src="{% static 'img/chatbot.png' %}" alt="AI 오엘" class="greeting-icon-inline">
+        <span>AI 오엘입니다!</span>
       </div>
+      <div class="initial-subtext">
+        <span>도움이 필요한 버튼을 눌러주세요.</span>
+    </div>
       <div class="scenario-buttons-fixed">
         <button class="scenario-btn" onclick="startScenario('trash_finder')">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">

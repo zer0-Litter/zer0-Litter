@@ -6,7 +6,6 @@
 {% endblock %}
 
 {% block content %}
-{% block title %}전체 민원{% endblock %}
 
 <div class="list-switch">
   <a href="{% url 'complain:staff_all_list' %}" class="tab {% if request.resolver_match.url_name == 'staff_all_list' %}active{% endif %}">전체</a>
@@ -92,25 +91,75 @@
   {% endfor %}
 </ul>
 
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="chev-left" viewBox="0 0 24 24">
+    <polyline points="15 18 9 12 15 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="chev-right" viewBox="0 0 24 24">
+    <polyline points="9 18 15 12 9 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+</svg>
+
 {% if page_obj.paginator.num_pages > 1 %}
 <div class="pagination">
   {% with qv=query.q|default:''|urlencode sv=query.status|default:''|urlencode fv=query.from|default:''|urlencode tv=query.to|default:''|urlencode %}
+
+    {# 맨앞 / 이전 #}
     {% if page_obj.has_previous %}
-      <a href="?page={{ page_obj.previous_page_number }}&q={{ qv }}&status={{ sv }}&from={{ fv }}&to={{ tv }}">이전</a>
+      <a class="page-link icon-btn first" href="?page=1&q={{ qv }}&status={{ sv }}&from={{ fv }}&to={{ tv }}" aria-label="맨앞">
+        <svg class="ico"><use href="#chev-left"/></svg>
+        <svg class="ico second"><use href="#chev-left"/></svg>
+      </a>
+      <a class="page-link icon-btn prev" href="?page={{ page_obj.previous_page_number }}&q={{ qv }}&status={{ sv }}&from={{ fv }}&to={{ tv }}" aria-label="이전">
+        <svg class="ico"><use href="#chev-left"/></svg>
+      </a>
+    {% else %}
+      <span class="page-link icon-btn disabled" aria-hidden="true">
+        <svg class="ico"><use href="#chev-left"/></svg>
+        <svg class="ico second"><use href="#chev-left"/></svg>
+      </span>
+      <span class="page-link icon-btn disabled" aria-hidden="true">
+        <svg class="ico"><use href="#chev-left"/></svg>
+      </span>
     {% endif %}
-    {% for num in page_obj.paginator.page_range %}
+
+    {# 항상 5개 고정 범위 출력 #}
+    {% for num in page_range %}
       {% if num == page_obj.number %}
-        <span class="current">{{ num }}</span>
+        <span class="page-link current">{{ num }}</span>
       {% else %}
-        <a href="?page={{ num }}&q={{ qv }}&status={{ sv }}&from={{ fv }}&to={{ tv }}">{{ num }}</a>
+        <a class="page-link"
+           href="?page={{ num }}&q={{ qv }}&status={{ sv }}&from={{ fv }}&to={{ tv }}">{{ num }}</a>
       {% endif %}
     {% endfor %}
+
+
+    {# 다음 / 맨뒤 #}
     {% if page_obj.has_next %}
-      <a href="?page={{ page_obj.next_page_number }}&q={{ qv }}&status={{ sv }}&from={{ fv }}&to={{ tv }}">다음</a>
+      <a class="page-link icon-btn next" href="?page={{ page_obj.next_page_number }}&q={{ qv }}&status={{ sv }}&from={{ fv }}&to={{ tv }}" aria-label="다음">
+        <svg class="ico"><use href="#chev-right"/></svg>
+      </a>
+      <a class="page-link icon-btn last" href="?page={{ page_obj.paginator.num_pages }}&q={{ qv }}&status={{ sv }}&from={{ fv }}&to={{ tv }}" aria-label="맨뒤">
+        <svg class="ico"><use href="#chev-right"/></svg>
+        <svg class="ico second"><use href="#chev-right"/></svg>
+      </a>
+    {% else %}
+      <span class="page-link icon-btn disabled" aria-hidden="true">
+        <svg class="ico"><use href="#chev-right"/></svg>
+      </span>
+      <span class="page-link icon-btn disabled" aria-hidden="true">
+        <svg class="ico"><use href="#chev-right"/></svg>
+        <svg class="ico second"><use href="#chev-right"/></svg>
+      </span>
     {% endif %}
+
   {% endwith %}
 </div>
 {% endif %}
+
+
+
+
 
 
 <script>

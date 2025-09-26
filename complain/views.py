@@ -257,10 +257,30 @@ def old_complaints_api(request):
 @require_GET
 def all_complaints_staff(request):
     page_obj, query = build_staff_items(request, force_status=None)
+
+    # 현재 페이지 기준 5개 고정
+    current = page_obj.number
+    total = page_obj.paginator.num_pages
+    if total <= 5:
+        page_range = range(1, total + 1)
+    else:
+        start = max(1, current - 2)
+        end = min(total, current + 2)
+        while end - start < 4:
+            if start > 1:
+                start -= 1
+            elif end < total:
+                end += 1
+            else:
+                break
+        page_range = range(start, end + 1)
+
     return render(request, "complain/staff_all_list.html", {
         "page_obj": page_obj,
         "query": query,
+        "page_range": page_range,  # ← 추가
     })
+
 
 @staff_member_required
 @require_GET

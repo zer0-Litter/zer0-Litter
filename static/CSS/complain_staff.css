@@ -124,13 +124,57 @@
 .btn-primary:hover{ background:var(--accent-hover); border-color:var(--accent-hover); }
 
 /* ===================== Pagination ===================== */
-.pagination{ display:flex; justify-content:center; align-items:center; gap:10px; margin:18px 0 10px; white-space:nowrap; }
-.page-link.prev, .page-link.next{
-  background:transparent; border:0; min-width:auto; height:auto; padding:0;
-  color:#6b7280; font-weight:500;
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0 10px;
+  white-space: nowrap;
 }
-.page-link.prev:hover, .page-link.next:hover{ color:var(--accent); background:transparent; }
-.page-link.prev.disabled, .page-link.next.disabled{ color:#c7c7c7; background:transparent; border:0; }
+
+.page-link, .pagination span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: auto;
+  height: auto;
+  padding: 0;
+  border: none;           /* ← 테두리 제거 */
+  background: none;       /* ← 배경 제거 */
+  font-size: 15px;
+  color: #333;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.page-link.current {
+  font-weight: 700;       /* ← 숫자 bold 강조 */
+  color: #142c47;         /* 강조 색상 */
+}
+
+.page-link.disabled {
+  color: #bbb;
+  cursor: default;
+}
+
+/* 아이콘형 페이지네이션 */
+.icon-btn { gap: 2px; }
+.icon-btn .ico {
+  width: 14px; height: 14px;
+  display: inline-block;
+  vertical-align: middle;
+}
+.icon-btn.first .second,
+.icon-btn.last  .second { margin-left: -4px; } /* 겹친 이중 꺾쇠 간격 */
+
+.page-link { color:#444; }
+.page-link.disabled { color:#ccc; cursor:default; }
+
+/* 숫자만 굵게 강조(이미 적용 중) */
+.page-link.current { font-weight:700; color:#142c47; }
+
+
 
 /* ===================== 반응형 ===================== */
 @media (max-width: 640px){
