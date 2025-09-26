@@ -679,7 +679,9 @@ function sendTextMessage() {
   const data = new FormData();
   data.append('message', messageText);
   data.append('session_id', session_id || '');
+  // 💡 수정: 일반 채팅 메시지이므로 scenario_id를 보내지 않습니다.
   data.append('scenario_id', current_scenario || 'complain_submit');
+  data.append('reset_session', 'false'); // 💡 추가: 세션 리셋 요청이 아님을 명확히 함
 
   // 주소 필드 추가
   const comLocation = document.getElementById('comLocationInput').value;
