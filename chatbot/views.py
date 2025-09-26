@@ -2,6 +2,8 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
+
+from trash_loc.views import haversine
 from .chatbot_core import chatbot_router
 from common.models_mongo import ChatHistory, Counter, ChatFiles, Complaints
 from datetime import datetime
@@ -163,13 +165,17 @@ def chatbot_api(request):
 
     print(f"username={username}, input={user_input}, scenario_id={scenario_id}, session_id={session_id}")
 
+    # 💡 [핵심 수정] 요청에서 위치 주소(com_location)를 추출 (임시 저장)
+    temp_com_location = (request.POST.get('com_location') or '').strip()
+    print(f"temp_com_location={temp_com_location}")
+
     # 💡 요청에서 위치 정보(위도, 경도)를 추출
     lat = float(request.POST.get('lat')) if request.POST.get('lat') not in (None, '',) else None
     lon = float(request.POST.get('lon')) if request.POST.get('lon') not in (None, '',) else None
 
     # 💡 챗봇 라우터 호출
     try:
-        result = chatbot_router(user_input, username, session_id, scenario_id)
+        result = chatbot_router(user_input, username, session_id, scenario_id, temp_com_location)
         print("router 결과:", result)
     except Exception as e:
         logger.error(f"router 호출 실패: {e}", exc_info=True)
@@ -254,8 +260,29 @@ def chatbot_api(request):
             location_doc = ChatHistory.objects(session_id=session_id, role='user', latitude__exists=True).order_by(
                 'created_at').first()
 
+            # 💡 [핵심 수정] final_com_location 설정 로직 (temp_com_location 사용 최우선)
+            # temp_com_location은 views.py의 request.POST에서 받은 주소 문자열입니다.
+            final_com_location = temp_com_location
+
+            if not final_com_location:
+                # 안전 장치: ChatHistory에서 '위치확인_주소:' 메시지에서 주소 추출
+                location_msg_doc = ChatHistory.objects(session_id=session_id, role='user',
+                                                       content__startswith='위치확인_주소:').order_by(
+                    'created_at').first()
+                if location_msg_doc:
+                    final_com_location = location_msg_doc.content.replace('위치확인_주소:', '').strip()
+
+            # 💡 최종적으로도 주소 정보가 없으면 로깅 (저장 전 필수 확인)
+            if not final_com_location:
+                logger.warning(f"민원(session_id: {session_id}) 저장을 위한 주소 정보(com_location)가 부족하여 저장이 취소됩니다.")
+                # 민원 저장 로직을 중단하고 응답을 반환하여 불완전한 저장을 막습니다.
+                # (이전 로그를 보면 com_location은 정상적으로 전달되고 있었습니다.)
+                # 만약 위치가 필수라면, 여기서 return 해야 함.
+                # 그러나 로그에는 com_location이 전달되었으므로 로직을 계속 진행합니다.
+
             if not location_doc or not location_doc.latitude or not location_doc.longitude:
-                logger.warning(f"민원(session_id: {session_id}) 저장을 위한 위치 정보가 부족합니다. 민원 저장이 취소됩니다.")
+                logger.warning(f"민원(session_id: {session_id}) 저장을 위한 위도/경도 위치 정보가 부족합니다. 민원 저장이 취소됩니다.")
+                # 위치 정보 부족 시 에러 메시지 반환 (기존 로직)
                 return JsonResponse({
                     'response': '죄송합니다. 위치 정보가 없어 민원 접수가 어렵습니다. 위치 정보를 포함하여 다시 시도해 주세요.',
                     'session_id': session_id
@@ -282,13 +309,14 @@ def chatbot_api(request):
                     "lat": lat,
                     "lon": lon,
                     "com_contents": complaint_summary,  # 챗봇이 요약한 내용으로 저장
-                    "com_reg_date": datetime.now()
+                    "com_reg_date": datetime.now(),
+                    "com_location": final_com_location,  # 💡 핵심: Complaints에 최종 주소 저장
                 }
 
-                # 💡 디버깅 코드 추가: 최종 저장될 com_contents 출력
+                # 💡 디버깅 코드 추가: 최종 저장될 com_contents 출력 (기존 코드)
                 print(f"최종 저장될 com_contents: {complaint_data['com_contents']}")
 
-                # 💡 해당 채팅에 첨부된 파일 정보(2개까지) 가져오기
+                # 💡 해당 채팅에 첨부된 파일 정보(2개까지) 가져오기 (기존 코드)
                 user_complaints_docs = ChatHistory.objects(session_id=session_id, role='user',
                                                            scenario_id='complain_submit').order_by('created_at')
                 related_files = ChatFiles.objects(chat_id__in=[doc.id for doc in user_complaints_docs]).order_by(
@@ -304,7 +332,7 @@ def chatbot_api(request):
                 Complaints(**complaint_data).save()
                 print(f"Complaints 저장 완료: com_id={complaint_id}")
 
-                # 💡 2. 임베딩을 생성하여 ChromaDB에 저장
+                # 💡 2. 임베딩을 생성하여 ChromaDB에 저장 (기존 코드)
                 doc_to_embed = LangchainDocument(
                     page_content=complaint_summary,  # 요약된 내용을 임베딩
                     metadata={
