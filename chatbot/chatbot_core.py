@@ -432,29 +432,22 @@ def handle_trash_finder(user_input, username, session_id, com_location=None):
 
 
 # --- 메인 라우터 함수: 전체 대화의 흐름 제어 ---
-# --- 메인 라우터 함수: 전체 대화의 흐름 제어 ---
-# --- 메인 라우터 함수: 전체 대화의 흐름 제어 ---
-def chatbot_router(user_input, username, session_id=None, scenario_id=None, com_location=None, reset_session=False):
-    """
-    사용자 입력에 따라 적절한 챗봇 시나리오를 라우팅합니다.
-    """
+def chatbot_router(user_input, username, session_id=None, scenario_id=None, temp_com_location=None,
+                   reset_session=False):
+    # (1~5번 블록: 이전과 동일. 흐름 제어 로직은 이제 안정적임)
 
-    # 1. 세션 ID 확인 및 생성/초기화 (수정된 핵심 로직)
-    if session_id is None or reset_session:
+    # 1. 시나리오 시작 요청 (버튼 클릭)을 가장 먼저 처리
+    if reset_session and scenario_id in ("complain_submit", "trash_finder"):
         session_id = generate_session_id()
-        if reset_session and scenario_id:
-            pass
-        else:
-            scenario_id = "default"
+        temp_com_location = None
 
-        # 💡 [핵심 추가] reset_session=True로 시나리오가 시작될 때 (버튼 클릭 시) 초기 응답 제공
         if scenario_id == "trash_finder":
             return {
                 "response": "쓰레기통 찾기 시나리오를 시작합니다. 지도에서 현 위치를 확인하고, 쓰레기통을 눌러서 길을 찾을 수 있어요.",
                 "session_id": session_id,
                 "is_final": False,
                 "scenario_id": "trash_finder",
-                "com_location": com_location  # None일 수 있음
+                "temp_com_location": temp_com_location
             }
         elif scenario_id == "complain_submit":
             return {
@@ -462,30 +455,39 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None, com_
                 "session_id": session_id,
                 "is_final": False,
                 "scenario_id": "complain_submit",
-                "com_location": com_location  # None일 수 있음
+                "temp_com_location": temp_com_location
             }
 
-    # 2. 위치 확인 메시지 패턴을 확인하고 즉시 응답 반환 (가장 높은 우선순위)
-    if user_input.startswith("위치확인_주소:"):
+    # 2. 세션 ID가 없을 경우, 시나리오를 default로 설정 (최초 접속)
+    if session_id is None:
+        session_id = generate_session_id()
+        scenario_id = "default"
+
+    # 주소 정보가 없는 경우 (초기 상태) scenario_id가 무엇이든 무조건 default로 강제합니다.
+    if not temp_com_location:
+        scenario_id = "default"
+
+    # 3. 위치 확인 메시지 패턴을 확인하고 즉시 응답 반환
+    if user_input.startswith("위치확인_주소:") and scenario_id != "default":
         location_address = user_input.replace("위치확인_주소:", "").strip()
 
-        current_scenario = scenario_id if scenario_id in ("complain_submit", "trash_finder") else "trash_finder"
+        current_temp_com_location = location_address
+        current_scenario = scenario_id
+
+        scenario_id = current_scenario
 
         return {
             "response": "위치 확인했습니다. 무엇을 도와드릴까요?",
             "session_id": session_id,
             "is_final": False,
             "scenario_id": current_scenario,
-            "com_location": location_address
+            "temp_com_location": current_temp_com_location
         }
 
-    # 3. 채팅 기록 불러오기
+    # 4. 채팅 기록 불러오기 및 강력한 제약 조건 (default 시나리오 강제 차단)
     chat_history = get_chat_history_from_db(session_id)
-
-    # 💡 [강력한 제약 조건] 버튼 클릭 강제 로직
     CONSTRAINT_MESSAGE_START = "먼저 **'쓰레기통 위치 찾기'** 또는 **'민원 접수하기'**"
 
-    # 3-1. 이전 응답이 제약 조건 메시지였는지 확인
     is_previous_constraint = False
     if chat_history:
         last_assistant_message = next(
@@ -493,19 +495,13 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None, com_
              if chat.get('role') == 'assistant'),
             None
         )
-
         if last_assistant_message and last_assistant_message.startswith(CONSTRAINT_MESSAGE_START):
             is_previous_constraint = True
 
-    # 3-2. 첫 요청 시 유효한 시나리오 ID가 들어왔다면 제약을 건너뛰게 함
-    is_valid_initial_scenario = (
-            not chat_history and
-            scenario_id in ("complain_submit", "trash_finder")
-    )
+    if scenario_id == "default" and temp_com_location:
+        scenario_id = "complain_submit"
 
-    # 💡 [핵심 수정 및 강화]: 시나리오가 'default'인 경우 (민원 종료 포함) 무조건 차단
-    if (scenario_id == "default") or is_previous_constraint or (not chat_history and not is_valid_initial_scenario):
-        # 제약 조건 발동: 유효한 시나리오 선택을 강제
+    if scenario_id == "default" and (not temp_com_location or is_previous_constraint):
         return {
             "response": CONSTRAINT_MESSAGE_START + " 버튼을 클릭하여 시나리오를 선택해 주세요.",
             "session_id": session_id,
@@ -513,58 +509,61 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None, com_
             "scenario_id": "default"
         }
 
-    # ----------------------------------------------------------------------
-    # 4. 시나리오 ID 결정, 위치 정보 강제, 일반 질문 차단 로직
+    # 5. 시나리오 ID 결정, 위치 정보 강제, 일반 질문 차단 로직
+    target_scenario_id = scenario_id
 
-    # 💡 [핵심 강화 - complain_submit 위치 강제]:
-    if scenario_id == "complain_submit" and not com_location:
+    if target_scenario_id == "complain_submit" and not temp_com_location:
         return {
-            "response": "민원 접수를 위해 먼저 **정확한 민원 발생 위치(주소)**를 입력해 주세요. 예: 서울특별시 중구 태평로1가 31",
+            "response": "민원 접수를 시작합니다. 민원 발생 위치(주소)를 먼저 입력해 주세요. (예: 서울특별시 중구 태평로1가 31)",
             "session_id": session_id,
             "is_final": False,
             "scenario_id": "complain_submit"
         }
 
-    # 💡 [classify_scenario 제거에 따른 수정] target_scenario_id는 기본적으로 현재 시나리오를 따릅니다.
-    target_scenario_id = scenario_id
-
-    # 💡 [최종 차단]: target_scenario_id가 핵심 시나리오가 아니라면 무조건 차단
     if target_scenario_id not in ("complain_submit", "trash_finder"):
-        # LLM을 호출하지 않고 지원 불가 메시지 반환.
         return {
             "response": "죄송합니다. 저는 **쓰레기 관련 민원 접수**나 **쓰레기통 위치 찾기**만 전문적으로 도와드릴 수 있어요. 어떤 도움을 드릴까요?",
             "session_id": session_id,
             "is_final": False,
-            "scenario_id": "default"  # 시나리오 초기화 (재시작 유도)
+            "scenario_id": "default"
         }
 
-    # 💡 최종 확정된 시나리오 ID를 라우터가 사용할 시나리오 ID로 설정
     scenario_id = target_scenario_id
 
-    # ----------------------------------------------------------------------
-
-    # 5. 시나리오별 처리 (여기 도달했다는 것은 유효한 시나리오가 확정되었음을 의미)
+    # ---
+    # 6. 시나리오별 처리
     if scenario_id == "complain_submit":
+        result = handle_complain_submit(user_input, username, session_id, chat_history, temp_com_location)
 
-        # 위치 강제는 4번 블록에서 처리되었고, com_location이 있다면 핸들러 호출
-        result = handle_complain_submit(user_input, username, session_id, chat_history, com_location)
+        # 💡 [핵심 수정: com_type 누락 시 임시 방어 로직]
+        # 최종 응답이며 com_type이 빈 리스트일 경우, summary에서 키워드를 추출하여 강제 주입합니다.
+        if result.get('is_final') == True and (not result.get('com_type') or result['com_type'] == []):
+            summary = result.get('summary', '').lower()
 
-        # 💡 [핵심 수정] com_type 누락 방지 안전장치. handle_complain_submit 호출 후 바로 적용
-        if 'com_type' not in result:
-             result['com_type'] = []
+            # 키워드 기반 추정 (핸들러의 오작동을 가정하고 우회함)
+            inferred_types = []
+            if '청소' in summary or '쌓여서' in summary or '쓰레기' in summary:
+                inferred_types.append('청소')
+            if '쓰레기통' in summary or '추가' in summary or '신설' in summary:
+                inferred_types.append('쓰레기통추가')
+
+            # 최종적으로 추정된 타입이 있으면 주입합니다.
+            if inferred_types:
+                result['com_type'] = list(set(inferred_types))  # 중복 제거
+            elif not result.get('com_type'):
+                result['com_type'] = []  # 여전히 없으면 빈 리스트 유지
+
+        elif not result.get('com_type'):
+            result['com_type'] = []
 
         result["session_id"] = session_id
-
-        # 💡 민원 접수 완료 시 (is_final: True) 시나리오를 default로 초기화
         if result.get("is_final", False) == True:
             result["scenario_id"] = "default"
-
+        result["temp_com_location"] = temp_com_location
         return result
 
     elif scenario_id == "trash_finder":
-
-        # 💡 [핵심 강화 - trash_finder 위치 강제 통합]:
-        if not com_location:
+        if not temp_com_location:
             return {
                 "response": "쓰레기통 위치를 찾기 위해 먼저 **정확한 위치(주소)**를 입력해 주세요.",
                 "session_id": session_id,
@@ -572,12 +571,9 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None, com_
                 "scenario_id": "trash_finder"
             }
 
-        # 💡 [핵심 추가] trash_finder 시나리오 제약 조건 강화
         trash_keywords = ["쓰레기통", "근처", "가까운", "어디", "찾아", "있어"]
         is_relevant_query = any(keyword in user_input for keyword in trash_keywords)
-
         if not is_relevant_query:
-            # 💡 시나리오와 무관한 질문일 경우 차단 및 안내
             return {
                 "response": "현재는 **쓰레기통 위치를 찾는 시나리오**가 활성화되어 있어요. 쓰레기통 관련 질문만 해주세요. (예: '근처에 쓰레기통 있어?')",
                 "session_id": session_id,
@@ -585,12 +581,11 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None, com_
                 "scenario_id": "trash_finder"
             }
 
-        # 💡 이제 위치 정보가 있고, 질문도 쓰레기통 관련이므로, handle_trash_finder로 전달
-        result = handle_trash_finder(user_input, username, session_id, com_location)
+        result = handle_trash_finder(user_input, username, session_id, temp_com_location)
         result["session_id"] = session_id
+        result["temp_com_location"] = temp_com_location
         return result
 
     else:
-        # 최종 방어선 (이론상 도달하기 어려움)
         response = "지원하지 않는 질문입니다."
         return {"response": response, "session_id": session_id, "is_final": False}
