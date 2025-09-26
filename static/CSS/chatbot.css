@@ -90,7 +90,7 @@ html, body {
   text-align: center;
   margin-top: 0;
   margin-bottom: 0.8rem;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   color: #555;
   font-weight: bold;
 }
@@ -106,8 +106,8 @@ html, body {
 
 .scenario-btn {
   margin-top: 0.5rem;
-  padding: 0.5rem 0.5rem;
-  font-size: 1.0rem;
+  padding: 0.5rem 0.3rem;
+  font-size: 0.9rem;
   border: none;
   border-radius: 10px;
   background-color: #E0E0E0;
@@ -123,8 +123,8 @@ html, body {
 }
 
 .scenario-btn svg {
-  width: 1.2rem;
-  height: 1.2rem;
+  width: 1.0rem;
+  height: 1.0rem;
   stroke: #333333;
 }
 
