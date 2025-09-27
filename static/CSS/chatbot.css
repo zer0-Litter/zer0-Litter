@@ -97,13 +97,13 @@ html, body {
 }
 
 .greeting-icon-inline {
-  width: 80px;   /* 아이콘 크기 조정 */
+  width: 80px;
   height: 80px;
   vertical-align: middle;
 }
 
 .greeting-title {
-  margin-bottom: 2px; /* 두 줄 사이 여백 */
+  margin-bottom: 2px;
 }
 
 .initial-subtext {
