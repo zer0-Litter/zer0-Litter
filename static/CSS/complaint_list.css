@@ -171,3 +171,43 @@ main{ padding:0!important; }
   .complaint-title{ font-size:15px; }
   .complaint-date{ font-size:12px; }
 }
+
+/* === Range 달력 공통 === */
+.dr-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:8px}
+.dr-title{font-weight:800}
+.dr-title button{border:none;background:none;padding:0 2px;font-weight:800;cursor:pointer}
+.dr-title button:hover{text-decoration:underline}
+.dr-nav{border:1px solid var(--border);background:#fff;border-radius:10px;height:32px;width:32px;cursor:pointer}
+
+.dr-week,.dr-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.dr-week span{font-size:12px;color:#888;text-align:center}
+
+.dr-cal .day{
+  height:34px;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;user-select:none;border:none;background:none;border-radius:0;
+}
+.dr-cal .day:hover{outline:none;color:#111;font-weight:600}
+.dr-cal .day.in-range{background:#e7f3ee}
+.dr-cal .day.is-start,.dr-cal .day.is-end{background:var(--accent);color:#fff;font-weight:700;border-radius:50%}
+.dr-cal .day.is-today{box-shadow:inset 0 0 0 1.5px var(--accent)}
+.dr-cal .day.is-out{opacity:.35;cursor:default}
+
+.dr-pick{display:grid;gap:6px;margin:8px 0 2px}
+.dr-pick.months{grid-template-columns:repeat(4,1fr)}
+.dr-pick.years {grid-template-columns:repeat(4,1fr)}
+.dr-pick .pick-btn{
+  height:30px;padding:0 6px;font-size:14px;border:1px solid var(--border);border-radius:8px;background:#fff;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+}
+.dr-pick .pick-btn:hover{border-color:#c9ced6;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.dr-pick .is-current{background:#f3f6f9;font-weight:700}
+
+/* 팝오버 폭: 기본/피커모드(연,월) 각각 더 좁게 */
+.daterange-popover{max-width:min(280px,90vw)}
+.daterange-popover.is-pick{max-width:min(220px,90vw)}
+.dr-week.is-hidden{display:none}
+
+/* 아주 작은 화면에서는 열 수를 줄여 더 좁게 */
+@media (max-width:420px){
+  .dr-pick.months,.dr-pick.years{grid-template-columns:repeat(3,1fr)}
+}

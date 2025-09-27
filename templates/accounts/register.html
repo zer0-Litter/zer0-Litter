@@ -176,19 +176,38 @@
       })
       .then(response => response.json().then(data => ({ status: response.status, body: data })))
       .then(({ status, body }) => {
-        if (status === 201) {
-          showModal(`${body.username}님 가입을 환영합니다!<br>로그인 후 다양한 서비스를 이용해보세요.`);
-          setTimeout(() => { window.location.href = "{% url 'accounts:login' %}"; }, 1500);
-        } else {
-          let errors = '';
-          for (const key in body) {
-            errors += Array.isArray(body[key]) ? body[key].join('<br>') + '<br>' : body[key] + '<br>';
+          if (status === 201) {
+            showModal(`${body.username}님 가입을 환영합니다!<br>로그인 후 다양한 서비스를 이용해보세요.`);
+            setTimeout(() => { window.location.href = "{% url 'accounts:login' %}"; }, 1500);
+          } else {
+            let errors = '';
+
+             // 비밀번호 에러일 때 → placeholder + "로 작성해주세요"
+              if (body.password) {
+                const pwInput = document.getElementById("password");
+                errors += pwInput.placeholder + "로 작성해주세요.<br>";
+              }
+
+              // 비밀번호 확인 에러일 때 → placeholder + "로 동일하게 입력해주세요"
+              if (body.password2) {
+                const pw2Input = document.getElementById("password2");
+                errors += pw2Input.placeholder + "로 동일하게 입력해주세요.<br>";
+              }
+
+            // 아이디 중복 등은 그대로 출력
+            for (const key in body) {
+              if (key !== 'password' && key !== 'password2') {
+                errors += Array.isArray(body[key]) ? body[key].join('<br>') + '<br>' : body[key] + '<br>';
+              }
+            }
+
+            showModal(errors || '가입에 실패했습니다.');
           }
-          showModal(errors || '가입에 실패했습니다.');
-        }
-      })
-      .catch(() => { showModal('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'); })
-      .finally(() => { submitBtn.disabled = false; });
+        })
+        .catch(() => {
+          showModal('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+        })
+        .finally(() => { submitBtn.disabled = false; });
     });
 
     function formatPhoneNumber(input) {

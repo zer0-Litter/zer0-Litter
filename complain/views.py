@@ -196,15 +196,20 @@ def complain_reuse(request, com_id):
         raise Http404("해당 민원을 찾을 수 없습니다.")
 
     types = obj.com_type if isinstance(obj.com_type, list) \
-        else [s.strip() for s in str(obj.com_type).split(',') if s.strip()]
-
+            else [s.strip() for s in str(obj.com_type).split(',') if s.strip()]
+    lat = getattr(obj, 'lat', None) or getattr(obj, 'com_lat', None) or ''
+    lon = getattr(obj, 'lon', None) or getattr(obj, 'com_lon', None) or ''
     reuse_data = {
-        'location': obj.com_location,
+        'location': obj.com_location or '',
+        'address': obj.com_location or '',
         'types': types,
         'contents': obj.com_contents or '',
-        'date': timezone.now().strftime('%Y-%m-%d')
+        'date': timezone.now().strftime('%Y-%m-%d'),
+        'lat': lat,
+        'lon': lon,
     }
 
+    # 최근 민원 10건(그대로 유지)
     qs = Complaints.objects(username=request.user.username).order_by('-com_reg_date')[:10]
     all_complaints = []
     for c in qs:
@@ -222,10 +227,14 @@ def complain_reuse(request, com_id):
 
     return render(request, 'complain/complain_add.html', {
         'initial': reuse_data,
+        'lat': lat,
+        'lon': lon,
         'today_date': reuse_data['date'],
         'is_reuse': 'Y',
         'origin_com_id': obj.com_id,
         'all_complaints': all_complaints,
+        'kakao_api_key': os.getenv('KAKAO_MAP_API_KEY'),
+        'district_id': '11000',
     })
 
 @login_required

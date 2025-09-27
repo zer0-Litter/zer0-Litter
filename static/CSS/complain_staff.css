@@ -111,11 +111,22 @@
 
 /* ===================== Date-range popover ===================== */
 .date-range.single{ position:relative; }
-.daterange-popover{
-  position:absolute; z-index:30; top:calc(100% + 6px); left:0; min-width:270px; padding:10px;
-  background:#fff; border:1px solid var(--border); border-radius:var(--radius);
-  box-shadow:0 8px 24px rgba(0,0,0,.08);
+
+.daterange-popover {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 18em; /* 270px ≈ 18em (폰트 15px 가정) */
+  max-width: 95vw; /* 화면 너비의 95% 안에서만 표시 */
+  padding: 0.8em;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,.08);
+  box-sizing: border-box;
 }
+
 .daterange-popover .row{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
 .daterange-popover .row.actions{ justify-content:flex-end; margin:0; }
 .daterange-popover input[type="date"]{
@@ -128,16 +139,91 @@
 
 /* 날짜 팝오버가 카드 밖으로 뜨도록(포털용) */
 .daterange-popover.is-fixed {
-  position: fixed !important;   /* body 기준으로 배치 */
-  left: 0; top: 0;              /* JS에서 좌표 덮어씀 */
-  z-index: 9999;                /* 최상단으로 */
-  min-width: 270px;
+  position: fixed !important;
+  min-width: 18em;
+  max-width: 95vw; /* 뷰포트 밖으로 안나가게 */
 }
 
 /* 작은 화면에서 너무 넓으면 줄바꿈 */
-@media (max-width: 360px){
-  .daterange-popover { min-width: 240px; }
+@media (max-width: 420px) {
+  .daterange-popover {
+    min-width: 16em;   /* 더 좁게 */
+    max-width: 90vw;   /* 여유 */
+  }
 }
+
+/* === Range 달력 === */
+.dr-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:8px}
+.dr-title{font-weight:700}
+
+/* 타이틀 버튼(연/월) */
+.dr-title button{
+  border:none; background:none; padding:0 2px; font-weight:800; font-size:16px; cursor:pointer;
+}
+.dr-title button:hover{ text-decoration:underline; }
+
+
+/* 연/월 선택 그리드 */
+.dr-pick{ display:grid; gap:6px; margin:8px 0 2px; }
+.dr-pick.months{ grid-template-columns:repeat(4,1fr); }
+.dr-pick.years { grid-template-columns:repeat(4,1fr); }
+
+.dr-pick .pick-btn{
+  height:26px;
+  padding: 0 8px;     /* 좌우 패딩 축소 */
+  font-size: 13px;    /* 글씨 크기 축소 */
+  border:1px solid var(--border);
+  border-radius:6px;
+  background:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  min-width: 38px;    /* 버튼 최소 너비 축소 */
+}
+.dr-pick .pick-btn:hover{ border-color:#c9ced6; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+.dr-pick .is-current{ background:#f3f6f9; font-weight:700; }
+
+.dr-nav{border:1px solid var(--border);background:#fff;border-radius:8px;height:32px;width:32px;cursor:pointer}
+.dr-week,.dr-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.dr-week span{font-size:12px;color:#888;text-align:center}
+.dr-cal .day{
+  height:36px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  user-select:none;
+
+  /* 박스 스타일 제거 */
+  border:none;
+  background:none;
+  border-radius:0;
+}
+
+/* Hover시 박스 대신 글자색만 살짝 강조 */
+.dr-cal .day:hover{
+  outline:none;
+  color:#111;
+  font-weight:600;
+}
+
+.dr-cal .day.is-out{opacity:.35;cursor:default}
+.dr-cal .day.is-disabled{opacity:.2;pointer-events:none}
+.dr-cal .day:hover{outline:1px dashed #cfd4da}
+.dr-cal .day.in-range{
+  background:#e7f3ee;
+  border-radius:50%;  /* 동그란 하이라이트 */
+}
+.dr-cal .day.is-start,
+.dr-cal .day.is-end{
+  background:var(--accent);
+  color:#fff;
+  font-weight:700;
+  border-radius:50%;
+}
+.dr-cal .day.is-today{box-shadow:inset 0 0 0 1.5px var(--accent)}
+
 
 /* ===================== Pagination ===================== */
 .pagination {
@@ -209,6 +295,36 @@
       "q"
       "actions";
   }
+}
+
+/* 기본 폭 제한(기존) + 상한 강화 */
+.daterange-popover{ max-width:min(480px,95vw); }
+
+/* 연/월 선택 모드일 때 더 컴팩트하게 */
+.daterange-popover.is-pick{ max-width:min(360px,95vw); }
+
+/* 연/월 피커 버튼 살짝 더 작게 */
+.dr-pick .pick-btn{ height:30px; padding:0 6px; font-size:14px; }
+
+/* 연/월 모드에서는 요일 헤더 감춤 */
+.dr-week.is-hidden{ display:none; }
+
+/* 작은 화면에서 열 수를 3열로 줄여 폭 확보 */
+@media (max-width: 420px){
+  .dr-pick.months, .dr-pick.years{ grid-template-columns:repeat(3,1fr); }
+}
+
+/* 달력 팝오버 너비 확 줄이기 */
+.daterange-popover {
+  min-width: auto !important;  /* 기본 최소 폭 제거 */
+  max-width: 240px !important; /* 최대 너비 확 줄임 */
+  width: 90vw !important;      /* 모바일 화면에서 뷰포트 기준 */
+  padding: 0.6em !important;   /* 안쪽 여백도 살짝 줄임 */
+}
+
+/* 연/월 선택 모드일 때 더 좁게 */
+.daterange-popover.is-pick {
+  max-width: 200px !important;
 }
 
 

@@ -20,11 +20,21 @@
     <input type="date" name="to"   id="date_to"   value="{{ query.to|default:'' }}"   hidden>
 
     <div id="daterange_popover" class="daterange-popover" hidden>
-      <div class="row">
-        <input type="date" id="dr_from">
-        <span class="tilde">~</span>
-        <input type="date" id="dr_to">
+      <div class="dr-head">
+        <button type="button" class="dr-nav prev" aria-label="이전">‹</button>
+        <div class="dr-title" id="dr_title">
+          <button type="button" class="dr-y">2025</button>년
+          <button type="button" class="dr-m">09</button>월
+        </div>
+        <button type="button" class="dr-nav next" aria-label="다음">›</button>
       </div>
+
+      <div class="dr-week">
+        <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+      </div>
+
+      <div id="dr_cal" class="dr-cal" aria-label="기간 선택 달력"></div>
+
       <div class="row actions">
         <button type="button" id="dr_clear" class="btn-ghost">지우기</button>
         <button type="button" id="dr_apply" class="btn-primary">적용</button>
@@ -157,7 +167,6 @@
 
 {% endblock %}
 
-
 {% block extra_script %}
 <script>
 (function () {
@@ -165,7 +174,7 @@
   function showUpdatedModalIfNeeded() {
     const url = new URL(window.location.href);
     if (url.searchParams.get('updated') === '1') {
-      window.showModal('변경되었습니다.', { confirmText: '확인', showCancel: false });
+      window.showModal?.('변경되었습니다.', { confirmText: '확인', showCancel: false });
       url.searchParams.delete('updated');
       history.replaceState(null, '', url.pathname + (url.searchParams.toString() ? '?' + url.searchParams.toString() : ''));
     }
@@ -191,75 +200,267 @@
     });
   }
 
-  /* 날짜 팝오버 (포털 방식, 요소 없으면 스킵) */
+  /* 날짜 팝오버 (한 달력 범위 선택 + 연/월 선택 모드) */
   function initDatePopover() {
     const display = document.getElementById('daterange_display');
     const pop     = document.getElementById('daterange_popover');
     const hFrom   = document.getElementById('date_from');
     const hTo     = document.getElementById('date_to');
-    const drFrom  = document.getElementById('dr_from');
-    const drTo    = document.getElementById('dr_to');
+    const calGrid = document.getElementById('dr_cal');
+    const btnPrev = pop?.querySelector('.dr-nav.prev');
+    const btnNext = pop?.querySelector('.dr-nav.next');
     const btnApply= document.getElementById('dr_apply');
     const btnClear= document.getElementById('dr_clear');
-    if (!display || !pop || !hFrom || !hTo || !drFrom || !drTo || !btnApply || !btnClear) return;
+    const yBtn    = pop?.querySelector('.dr-y');   // 제목의 연도 버튼
+    const mBtn    = pop?.querySelector('.dr-m');   // 제목의 월 버튼
+    if (!display || !pop || !hFrom || !hTo || !calGrid || !btnPrev || !btnNext || !btnApply || !btnClear || !yBtn || !mBtn) return;
 
-    function fmt(a,b){ if(a&&b)return `${a} ~ ${b}`; if(a)return `${a} ~ `; if(b)return ` ~ ${b}`; return ''; }
-    function closePopover(){
-      pop.hidden = true;
-      if (pop.__originParent) {
-        pop.classList.remove('is-fixed');
-        pop.style.left = '';
-        pop.style.top  = '';
-        pop.style.width = '';
-        pop.__originParent.appendChild(pop);
-        pop.__originParent = null;
-      }
+    const wrap = display.closest('.date-range');
+    let insidePress = false;
+    const setInsidePress = () => { insidePress = true; setTimeout(()=> insidePress = false, 0); };
+
+    // ▼▼ (1) weekRow와 클램프 함수는 '사용 전에' 선언
+    const weekRow = pop.querySelector('.dr-week');
+    function clampPopoverWithinViewport(){
+      const M = 8, vw = window.innerWidth;
+      const r = pop.getBoundingClientRect();
+      let left = r.left;
+      const over = (r.right + M) - vw;
+      if (over > 0) left -= over;
+      if (left < M) left = M;
+      pop.style.left = Math.round(left) + 'px';
     }
+
+    // 상태값
+    let viewYM;             // 보이는 년월(해당 달의 1일)
+    let startDate = null;   // 시작 날짜(Date)
+    let endDate   = null;   // 끝 날짜(Date)
+    let mode = 'date';      // 'date' | 'month' | 'year'
+
+    const fmt = (d)=> d ? d.toISOString().slice(0,10) : '';
+    const parse = (s)=> s ? new Date(s+'T00:00:00') : null;
+
     function openPopover(){
-      drFrom.value = hFrom.value || '';
-      drTo.value   = hTo.value   || '';
+      // 숨김값을 상태로 반영
+      startDate = parse(hFrom.value);
+      endDate   = parse(hTo.value);
+      // 뷰 기준 년월: 우선 끝값, 없으면 시작값, 둘 다 없으면 오늘
+      const base = endDate || startDate || new Date();
+      viewYM = new Date(base.getFullYear(), base.getMonth(), 1);
 
       if (!pop.__originParent) pop.__originParent = pop.parentElement;
       document.body.appendChild(pop);
       pop.hidden = false;
       pop.classList.add('is-fixed');
 
-      const r = display.getBoundingClientRect();
+      // 위치 (뷰포트 내부 고정)
+      const r  = display.getBoundingClientRect();
       const vw = window.innerWidth, vh = window.innerHeight;
+      const popW = Math.max(300, pop.offsetWidth || 300);
+      const popH = pop.offsetHeight || 260;
+      let left = Math.min(r.left, vw - popW - 8);
+      let top  = r.bottom + 6;
+      if (left < 8) left = 8;
+      if (top + popH > vh - 8) top = Math.max(8, r.top - popH - 6);
+      pop.style.left = Math.round(left) + 'px';
+      pop.style.top  = Math.round(top)  + 'px';
 
-      let left = Math.round(r.left);
-      let top  = Math.round(r.bottom + 6);
-
-      const popW = Math.max(270, pop.offsetWidth || 270);
-      const popH = pop.offsetHeight || 160;
-      if (left + popW > vw - 8) left = Math.max(8, vw - popW - 8);
-      if (top  + popH > vh - 8) top  = Math.max(8, r.top - popH - 6);
-
-      pop.style.left = left + 'px';
-      pop.style.top  = top  + 'px';
-      if (popW > vw - 16) pop.style.width = (vw - 16) + 'px';
+      // 기본은 날짜 모드
+      mode = 'date';
+      render();
+      requestAnimationFrame(clampPopoverWithinViewport); // 안전클램프
     }
+
+    function closePopover(){
+      pop.hidden = true;
+      if (pop.__originParent) {
+        pop.classList.remove('is-fixed');
+        pop.style.left = '';
+        pop.style.top  = '';
+        pop.__originParent.appendChild(pop);
+      }
+    }
+
+    function setTitle(){
+      const y = viewYM.getFullYear();
+      const m = viewYM.getMonth()+1;
+      yBtn.textContent = String(y);
+      mBtn.textContent = String(m).padStart(2,'0');
+    }
+
+    function renderDate(){
+      pop.classList.remove('is-pick');
+      weekRow?.classList.remove('is-hidden');
+      setTitle();
+      calGrid.innerHTML = '';
+      const y = viewYM.getFullYear(), m = viewYM.getMonth();
+      const first = new Date(y,m,1);
+      const last  = new Date(y,m+1,0);
+      const today = new Date(); today.setHours(0,0,0,0);
+
+      // 요일 보정(일=0)
+      const lead = first.getDay();
+      for(let i=0;i<lead;i++){
+        const span = document.createElement('div');
+        span.className='day is-out';
+        calGrid.appendChild(span);
+      }
+
+      for(let d=1; d<=last.getDate(); d++){
+        const cur = new Date(y,m,d);
+        const cell = document.createElement('button');
+        cell.type='button';
+        cell.className='day';
+        cell.textContent = d;
+
+        // 상태 클래스
+        if (cur.getTime()===today.getTime()) cell.classList.add('is-today');
+        if (startDate && cur.getTime()===startDate.getTime()) cell.classList.add('is-start');
+        if (endDate   && cur.getTime()===endDate.getTime())   cell.classList.add('is-end');
+        if (startDate && endDate && cur>=startDate && cur<=endDate) cell.classList.add('in-range');
+
+        // 클릭 핸들
+        cell.addEventListener('click', () => {
+          if (!startDate || (startDate && endDate)) {
+            startDate = cur; endDate = null;
+          } else {
+            if (cur < startDate) { endDate = startDate; startDate = cur; }
+            else { endDate = cur; }
+          }
+          const a = fmt(startDate), b = fmt(endDate);
+          display.value = a && b ? `${a} ~ ${b}` : (a ? `${a} ~ ` : (b ? ` ~ ${b}` : ''));
+          render();
+        });
+
+        calGrid.appendChild(cell);
+      }
+      requestAnimationFrame(clampPopoverWithinViewport);
+    }
+
+    function renderMonth(){
+      pop.classList.add('is-pick');
+      weekRow?.classList.add('is-hidden');
+      setTitle();
+      calGrid.innerHTML = '';
+      const y = viewYM.getFullYear();
+      const wrap = document.createElement('div');
+      wrap.className = 'dr-pick months';
+      for (let m=0; m<12; m++){
+        const b = document.createElement('button');
+        b.type='button';
+        b.className='pick-btn';
+        b.textContent = (m+1).toString().padStart(2,'0');
+        if (m === viewYM.getMonth()) b.classList.add('is-current');
+        b.addEventListener('click', () => {
+          viewYM = new Date(y, m, 1);
+          mode = 'date';
+          render();
+        });
+        wrap.appendChild(b);
+      }
+      calGrid.appendChild(wrap);
+      requestAnimationFrame(clampPopoverWithinViewport);
+    }
+
+    function renderYear(){
+      pop.classList.add('is-pick');
+      weekRow?.classList.add('is-hidden');
+      setTitle();
+      calGrid.innerHTML = '';
+      const cy = viewYM.getFullYear();
+      const base = cy - (cy % 12); // 12년 단위 블록
+      const wrap = document.createElement('div');
+      wrap.className = 'dr-pick years';
+      for (let i=0; i<12; i++){
+        const yy = base + i;
+        const b = document.createElement('button');
+        b.type='button';
+        b.className='pick-btn';
+        b.textContent = String(yy);
+        if (yy === cy) b.classList.add('is-current');
+        b.addEventListener('click', () => {
+          viewYM = new Date(yy, viewYM.getMonth(), 1);
+          mode = 'month';
+          render();
+        });
+        wrap.appendChild(b);
+      }
+      calGrid.appendChild(wrap);
+      requestAnimationFrame(clampPopoverWithinViewport);
+    }
+
+    // 모드 스위치 렌더
+    function render(){
+      if (mode === 'date')  return renderDate();
+      if (mode === 'month') return renderMonth();
+      if (mode === 'year')  return renderYear();
+    }
+
+    // 네비게이션(‹/›)
+    btnPrev.addEventListener('click', ()=>{
+      if (mode === 'date')        viewYM = new Date(viewYM.getFullYear(), viewYM.getMonth()-1, 1);
+      else if (mode === 'month')  viewYM = new Date(viewYM.getFullYear()-1, viewYM.getMonth(), 1);
+      else /* year */             viewYM = new Date(viewYM.getFullYear()-12, viewYM.getMonth(), 1);
+      render();
+    });
+    btnNext.addEventListener('click', ()=>{
+      if (mode === 'date')        viewYM = new Date(viewYM.getFullYear(), viewYM.getMonth()+1, 1);
+      else if (mode === 'month')  viewYM = new Date(viewYM.getFullYear()+1, viewYM.getMonth(), 1);
+      else /* year */             viewYM = new Date(viewYM.getFullYear()+12, viewYM.getMonth(), 1);
+      render();
+    });
+
+    // 타이틀 연/월 클릭 → 모드 전환
+    yBtn.addEventListener('click', ()=>{ mode = 'year';  render(); });
+    mBtn.addEventListener('click', ()=>{ mode = 'month'; render(); });
+
+    // 적용/지우기
     function apply(){
-      let a = drFrom.value, b = drTo.value;
-      if (a && b && a > b) { const t=a; a=b; b=t; }
-      hFrom.value = a || '';
-      hTo.value   = b || '';
-      display.value = fmt(hFrom.value, hTo.value);
+      let a = startDate, b = endDate;
+      if (a && b && b < a) { const t=a; a=b; b=t; }
+      hFrom.value = a ? fmt(a) : '';
+      hTo.value   = b ? fmt(b) : '';
+      display.value = (hFrom.value && hTo.value) ? `${hFrom.value} ~ ${hTo.value}`
+                      : (hFrom.value ? `${hFrom.value} ~ ` : (hTo.value ? ` ~ ${hTo.value}` : ''));
       closePopover();
     }
-    function clearAll(){ drFrom.value=''; drTo.value=''; hFrom.value=''; hTo.value=''; display.value=''; closePopover(); }
-
-    display.value = fmt(hFrom.value, hTo.value);
-    display.addEventListener('click', (e)=>{ e.stopPropagation(); openPopover(); });
-    document.addEventListener('click', (e)=>{ if (!pop.hidden && !pop.contains(e.target) && e.target !== display) closePopover(); });
+    function clearAll(){
+      startDate = endDate = null;
+      hFrom.value = hTo.value = '';
+      display.value = '';
+      render();
+      closePopover();
+    }
     btnApply.addEventListener('click', apply);
     btnClear.addEventListener('click', clearAll);
-    drFrom.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); apply(); }});
-    drTo  .addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); apply(); }});
+
+    // 열기/닫기
+    display.value = (hFrom.value && hTo.value) ? `${hFrom.value} ~ ${hTo.value}`
+                    : (hFrom.value ? `${hFrom.value} ~ ` : (hTo.value ? ` ~ ${hTo.value}` : ''));
+    display.addEventListener('pointerdown', (e)=>{ setInsidePress(); e.stopPropagation(); });
+    display.addEventListener('click', (e)=>{ e.stopPropagation(); openPopover(); });
+
+    // 팝오버/래퍼 내부는 모두 버블링 차단 + insidePress 세팅
+    ['pointerdown','mousedown','click'].forEach(type => {
+      pop.addEventListener(type,  (e)=>{ setInsidePress(); e.stopPropagation(); });
+      wrap.addEventListener(type, (e)=>{ setInsidePress(); e.stopPropagation(); });
+    });
+
+    // ▼▼ (2) 여기 있던 불필요한 `});` 한 줄은 삭제했습니다.
+
+    // 바깥 클릭 시 닫기 (pointerdown 기준)
+    document.addEventListener('pointerdown', (e)=>{
+      if (insidePress) return;
+      if (!pop.hidden && !pop.contains(e.target) && !(wrap && wrap.contains(e.target))) {
+        closePopover();
+      }
+    }, { capture:true });
+
     window.addEventListener('resize', closePopover);
     window.addEventListener('scroll', closePopover, { passive:true });
   }
 
+  // 초기화
   window.addEventListener('DOMContentLoaded', function(){
     showUpdatedModalIfNeeded();
     bindMarkComplete();
