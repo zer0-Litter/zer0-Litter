@@ -49,7 +49,10 @@
   transform:translateY(-50%);      /* ← 카드 전체 기준 세로 중앙 */
   display:flex; align-items:center; justify-content:center;
   margin:0; height:auto;
+  pointer-events: auto;
 }
+
+.complaint-status .js-mark-complete { pointer-events: auto; cursor: pointer; }
 
 /* 뱃지 공통 */
 .badge{
@@ -122,6 +125,19 @@
 .btn-ghost{ border:1px solid var(--border); background:#fff; }
 .btn-primary{ border:1px solid var(--accent); background:var(--accent); color:#fff; }
 .btn-primary:hover{ background:var(--accent-hover); border-color:var(--accent-hover); }
+
+/* 날짜 팝오버가 카드 밖으로 뜨도록(포털용) */
+.daterange-popover.is-fixed {
+  position: fixed !important;   /* body 기준으로 배치 */
+  left: 0; top: 0;              /* JS에서 좌표 덮어씀 */
+  z-index: 9999;                /* 최상단으로 */
+  min-width: 270px;
+}
+
+/* 작은 화면에서 너무 넓으면 줄바꿈 */
+@media (max-width: 360px){
+  .daterange-popover { min-width: 240px; }
+}
 
 /* ===================== Pagination ===================== */
 .pagination {
