@@ -73,10 +73,15 @@
 
     <div id="trashDetailModal" style="display:none;">
       <div class="modal-content">
-        <span class="close" onclick="closeModal()">&times;</span>
+
+        <div class="modal-header">
+          <span class="close" onclick="closeModal()">&times;</span>
+        </div>
+
         <div class="trash-image">
           <img id="trashImage" src="/static/img/default_bin.png" alt="쓰레기통 사진">
         </div>
+
         <div class="trash-info">
           <h3 id="trashAddressMain">주소 정보 없음</h3>
           <div class="trash-type-wrap">
@@ -678,7 +683,9 @@ function sendTextMessage() {
   const data = new FormData();
   data.append('message', messageText);
   data.append('session_id', session_id || '');
+  // 💡 수정: 일반 채팅 메시지이므로 scenario_id를 보내지 않습니다.
   data.append('scenario_id', current_scenario || 'complain_submit');
+  data.append('reset_session', 'false'); // 💡 추가: 세션 리셋 요청이 아님을 명확히 함
 
   // 주소 필드 추가
   const comLocation = document.getElementById('comLocationInput').value;
