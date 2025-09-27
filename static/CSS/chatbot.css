@@ -94,13 +94,16 @@ html, body {
   font-size: 1.1rem;
   font-weight: bold;
   color: #555;
-  margin-bottom: 0.3rem;
 }
 
 .greeting-icon-inline {
-  width: 24px;   /* 아이콘 크기 조정 */
-  height: 24px;
+  width: 80px;
+  height: 80px;
   vertical-align: middle;
+}
+
+.greeting-title {
+  margin-bottom: 2px;
 }
 
 .initial-subtext {
@@ -116,6 +119,7 @@ html, body {
   gap: 0.5rem;
   font-family: 'Pretendard Variable', sans-serif;
   flex-shrink: 0;
+  margin-bottom: 0.3rem;
 }
 
 .scenario-btn {
