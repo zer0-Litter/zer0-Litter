@@ -302,7 +302,6 @@ def complaint_all_list(request):
 
     user_complaints = (
         Complaints.objects(base_q)
-        .only('com_id','com_reg_date','com_type','com_location','com_contents')
         .order_by('-com_reg_date')
     )
 
@@ -323,6 +322,9 @@ def complaint_all_list(request):
         type_display = ', '.join(type_list) if type_list else ''
         icon_type = type_list[0] if type_list else '기타'
 
+        lat = getattr(complaint, 'lat', None) or getattr(complaint, 'com_lat', None)
+        lon = getattr(complaint, 'lon', None) or getattr(complaint, 'com_lon', None)
+
         all_complaints.append({
             'com_id': complaint.com_id,
             'date': complaint.com_reg_date,
@@ -332,6 +334,8 @@ def complaint_all_list(request):
             'location': complaint.com_location,
             'status': status_name,
             'content': complaint.com_contents,
+            'lat': lat,
+            'lon': lon,
         })
 
     if status in ('처리중','처리완료'):
