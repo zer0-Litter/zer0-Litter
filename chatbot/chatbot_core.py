@@ -92,22 +92,40 @@ _complaint_chain_prompt = ChatPromptTemplate.from_messages([
     SystemMessagePromptTemplate.from_template(
         "당신은 친절하지만 정확한 민원 접수 챗봇입니다. 사용자의 불편함에 공감하면서도 빠르게 민원을 제보할 수 있게 질문하며 대화하세요."
         "단계별로 추론해서 답변해"
-        "사용자의 민원을 '청소요청', '수리요청', '추가요청', '기타민원' 중 하나 또는 여러 개로 분류하세요. "
-        "청소요청, 수리요청, 추가요청, 기타민원 중에 어떤 건지 넣어줘. 중복도 가능해. "
+
+        # ✅ '기타민원' -> '기타'로 통일
+        "사용자의 민원을 '청소요청', '수리요청', '추가요청', '기타' 중 하나 또는 여러 개로 분류하세요. "
+
+        # ✅ '기타민원' -> '기타'로 통일
+        "청소요청, 수리요청, 추가요청, 기타 중에 어떤 건지 넣어줘. 중복도 가능해. "
         "청소요청은 쓰레기통이나 쓰레기통이 없어도 가능한 요청이고, "
         "수리요청은 기존 쓰레기통의 파손이나 고장 관련 내용이야. "
         "추가요청은 쓰레기통이 없는 곳에 **새로 설치하거나 더 많이** 만들어 달라는 내용이야. "
-        "기타민원은 그 이외의 모든 민원(무단투기 단속, 정책 제안 등)을 포함해. "
-        "만약 '무단투기', '상습적으로 버린다', '자주 버린다' 같은 키워드가 포함되면 '기타민원'으로 분류하세요."
-        "만약 여러 개의 유형이라면 쉼표(,)로 구분하세요. (예: 청소요청,기타민원)"
+
+        # ✅ '기타민원' -> '기타'로 통일
+        "기타는 그 이외의 모든 민원(무단투기 단속, 정책 제안 등)을 포함해. "
+
+        # ✅ '기타민원' -> '기타'로 통일
+        "만약 '무단투기', '상습적으로 버린다', '자주 버린다' 같은 키워드가 포함되면 '기타'으로 분류하세요."
+
+        # ✅ 쉼표 예시에서도 '기타민원' -> '기타'로 수정
+        "만약 여러 개의 유형이라면 쉼표(,)로 구분하세요. (예: 청소요청,기타)"
         "만약 분류가 명확하지 않다면, 공감하며 자연스러운 질문을 생성하여 추가 정보를 요청하세요."
         "예시: '많이 불편하셨겠어요. 쓰레기통이 가득 찬 건가요, 아니면 주변에 쓰레기가 쌓여 있는 건가요?'"
+
         "오직 분류 결과(유형)나 질문(문장)만 반환하세요."
-        "기타 민원의 경우에는 정책 제안이나 쓰레기 무단투기 단속 강화 등이 있을 수 있어."
+
+        # ✅ '기타민원' -> '기타'로 통일
+        "기타의 경우에는 정책 제안이나 쓰레기 무단투기 단속 강화 등이 있을 수 있어."
+
         "민원 타입이 추론되면 사용자에게 해당 유형이 맞는지 물어보고 확정하세요. "
         "예시: '쓰레기가 많이 쌓여서 청소요청이 필요하시다는 말씀이실까요?'"
         "사용자가 '네', '맞아', '어', '응', '접수해줘'와 같이 긍정적으로 확인하면, 최종적으로 '민원 접수가 완료되었습니다.'와 같은 확정 문장을 반환하세요."
+
+        # ✅ 최종 지시: '기타민원' -> '기타'로 통일
+        "민원 추론 결과는 무조건 '청소요청', '수리요청', '추가요청', '기타' **중에서만** 분류하세요. 다른 단어는 사용하지 마세요."
         "최대한 간결하고 짧게 답변하세요."
+
     ),
     MessagesPlaceholder(variable_name="chat_history"),
     HumanMessagePromptTemplate.from_template("이전 민원 기록: {retrieved_context}\n\n사용자 발화: {user_input}")
@@ -226,11 +244,25 @@ def retrieve_complaint_history_with_filter(query, com_types, num_results=3):
     return context.strip()
 
 
+# chatbot_core.py 내의 extract_complaint_types 함수
 def extract_complaint_types(llm_output):
     """LLM 응답에서 민원 유형을 추출합니다."""
-    known_types = ["청소요청", "수리요청", "추가요청", "기타민원"]
-    return [known_type for known_type in known_types if known_type in llm_output]
+    # LLM 프롬프트에 정의된 유효 타입과 일치시키고, 부분 일치를 피하기 위해 정확히 정의합니다.
+    known_types = ["청소요청", "수리요청", "추가요청", "기타"]
 
+    # ❗️ [수정] LLM 출력 전체에서 known_types를 찾는 대신,
+    # LLM이 분류 결과만 반환했을 때 (예: "청소요청,기타")를 더 잘 처리하도록 변경합니다.
+    # 하지만 현재 LLM은 질문이나 최종 응답 문장을 섞어 반환하므로, 기존 방식(부분 일치)을 유지하되,
+    # '청소'가 아닌 '청소요청' 전체를 찾아야 합니다.
+
+    # known_types를 정확히 포함하는지 확인
+    found_types = []
+    for known_type in known_types:
+        # LLM 응답 전체 문장에서 해당 키워드가 포함되어 있는지 확인
+        if known_type in llm_output:
+            found_types.append(known_type)
+
+    return found_types
 
 def truncate_to_full_sentence(text):
     """텍스트를 완전한 문장 단위로 자릅니다."""
@@ -288,8 +320,14 @@ def handle_complain_submit(user_input, username, session_id, chat_history, com_l
     if is_final:
         # 최종 민원 유형 확정
         com_types = get_com_types_from_history(chat_history)
-        # 사용자 마지막 발화에서 추론된 유형 추가
-        com_types.extend(extract_complaint_types(user_input))
+
+        # ✅ [핵심 수정] LLM의 최종 응답에서 추출된 유형(llm_types)을 추가합니다.
+        # LLM이 '청소요청,기타민원으로 접수하겠습니다'를 보냈다면, 'llm_types'에는 ['청소요청', '기타']가 들어있어야 합니다.
+        com_types.extend(llm_types)
+
+        # ⚠️ [보완] 사용자 마지막 발화에서 추론된 유형은 일반적으로 최종 확정 문장에는 포함되지 않으므로 제거합니다.
+        # com_types.extend(extract_complaint_types(user_input)) #
+
         com_types = list(set(com_types))
 
         summary = summarize_conversation(chat_history)
