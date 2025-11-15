@@ -23,7 +23,7 @@
 | 분류 | 기술 스택 | 설명 |
 | :--- | :--- | :--- |
 | **웹/백엔드** | **Django (Python)** | 핵심 서비스 로직 및 회원, 쓰레기통 위치 DB 관리. |
-| **AI/LLM** | **GPT-4o-mini, LangChain, RAG** | AI 챗봇(zL 오웰) 구현 및 민원/응답 특화. |
+| **AI/LLM** | **GPT-4o-mini, LangChain, RAG** | AI 챗봇(0L 오엘) 구현 및 민원/응답 특화. |
 | **데이터베이스** | **SQLite, MongoDB, ChromaDB** | 정형 데이터(SQLite), 비정형/로그 데이터(MongoDB), 임베딩 벡터(ChromaDB). |
 | **데이터 파이프라인** | **Apache Airflow, Selenium, Pandas** | 민원 데이터 크롤링 및 전처리, DB 적재 스케줄링 자동화. |
 | **시각화** | **Chart.js, Folium** | 대시보드 통계 및 지도 시각화. |
