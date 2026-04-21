@@ -75,5 +75,5 @@
 | 이름 | 역할 | 담당 상세 업무 |
 | :--- | :--- | :--- |
 | **박OO** (팀장, PM & DS) | Data, DS, FE/BE, Git/일정 | RAG 챗봇 구현 및 ChromaDB 구축, 챗봇/대시보드/Nav 구현, 임베딩/스케줄링 코드, PPT |
-| **진OO** (DE) | Data, DE, FE/BE, 노션 관리 | 민원 DB 클롤링/전처리, SQLite/MongoDB 구축, Airflow 스케줄링 설정 |
-| **고OO** (DE) | Data, DE, FE/BE, 노션 관리 | 쓰레기통 DB 전처리, 기획/로고 디자인, 로그인/마이페이지/대시보드 FE/BE 구현, DB/Airflow 관리 |
+| **진OO** (DE) | Data, DE, FE/BE, 노션 관리 | 민원 DB 크롤링/전처리, SQLite/MongoDB 구축, DB관리, Airflow 스케줄링 설정, 로그인/마이페이지/대시보드 FE/BE 구현, |
+| **고OO** (DE) | Data, DE, FE/BE, 노션 관리 | 쓰레기통 DB 전처리, 기획/로고 디자인,  DB/Airflow 관리 |
