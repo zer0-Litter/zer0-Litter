@@ -1,8 +1,27 @@
+# --- Python / 가상환경 ---
 zero-venv/
+venv/
+.venv/
 __pycache__/
 *.pyc
+
+# --- 환경변수 (.envsample 은 추적 대상) ---
 .env
+
+# --- 로컬 데이터베이스 ---
+*.sqlite3
+db.sqlite3
+
+# --- 벡터 스토어 (재생성 가능: rebuild_chromadb.py) ---
+chroma_db/
+
+# --- 크롤링 산출물 ---
+*.csv
+
+# --- 로그 ---
+*.log
+
+# --- IDE / OS ---
 .idea/
 .vscode/
 .DS_Store
-*.log

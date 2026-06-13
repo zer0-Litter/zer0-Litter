@@ -8,6 +8,7 @@ from chromadb import HttpClient
 from config import settings
 from chatbot.chatbot_core import preprocess_text
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 load_dotenv()
@@ -26,9 +27,9 @@ try:
     chroma_client = HttpClient(host=CHROMA_DB_HOST, port=CHROMA_DB_PORT)
     try:
         chroma_client.delete_collection(name="complaint_embeddings")
-        print("✅ 기존 'complaint_embeddings' 컬렉션을 성공적으로 삭제했습니다.")
+        logger.info("기존 'complaint_embeddings' 컬렉션을 성공적으로 삭제했습니다.")
     except Exception as e:
-        print(f"⚠️ 컬렉션 삭제 중 오류 발생: {e}. 컬렉션이 존재하지 않을 수 있습니다.")
+        logger.warning("컬렉션 삭제 중 오류 발생: %s. 컬렉션이 존재하지 않을 수 있습니다.", e)
 
     vector_store = Chroma(
         collection_name="complaint_embeddings",
@@ -36,7 +37,7 @@ try:
         client=chroma_client
     )
 
-    print("⏳ MongoDB에서 민원 데이터를 불러오는 중...")
+    logger.info("MongoDB에서 민원 데이터를 불러오는 중...")
     complaints_data = list(complaints_collection.find({}))
 
     texts_to_embed = []
@@ -62,13 +63,12 @@ try:
                 metadatas_to_add.append({"com_type": com_type_string})
 
     if texts_to_embed:
-        print(f"✨ {len(texts_to_embed)}개의 민원 데이터를 ChromaDB에 임베딩하여 저장합니다.")
+        logger.info("%d개의 민원 데이터를 ChromaDB에 임베딩하여 저장합니다.", len(texts_to_embed))
         # 메타데이터를 함께 저장하도록 수정
         vector_store.add_texts(texts=texts_to_embed, metadatas=metadatas_to_add)
-        print("🎉 ChromaDB 초기화 및 데이터 로드가 완료되었습니다!")
+        logger.info("ChromaDB 초기화 및 데이터 로드가 완료되었습니다!")
     else:
-        print("데이터베이스에 임베딩할 민원 텍스트가 없습니다.")
+        logger.info("데이터베이스에 임베딩할 민원 텍스트가 없습니다.")
 
 except Exception as e:
-    logger.error(f"ChromaDB 연결 또는 데이터 로드 실패: {e}", exc_info=True)
-    print("❌ 스크립트 실행 중 치명적인 오류가 발생했습니다.")
+    logger.error("ChromaDB 연결 또는 데이터 로드 실패: %s", e, exc_info=True)

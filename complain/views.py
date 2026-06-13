@@ -1,16 +1,51 @@
+from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 from common.models_mongo import Complaints, ComplaintStatus, Counter, ReComplaints
-from common.models import TrashLoc
+from common.utils import normalize_com_types
 from django.http import Http404, JsonResponse
 from uuid import uuid4
 from mongoengine.queryset.visitor import Q
 from datetime import datetime, timedelta
 from django.core.paginator import Paginator
+from django.utils.http import url_has_allowed_host_and_scheme
 import os
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def _safe_next(request, candidate, fallback):
+    """오픈 리다이렉트 방지: 내부 경로만 허용하고, 아니면 fallback 사용."""
+    if candidate and url_has_allowed_host_and_scheme(
+        candidate,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return candidate
+    return fallback
+
+
+def _page_range(page_obj, window=2):
+    """현재 페이지 기준 최대 (2*window+1)개의 페이지 번호 범위를 만든다.
+    스태프 목록 3곳에 중복돼 있던 로직을 한 곳으로 모은 것."""
+    current = page_obj.number
+    total = page_obj.paginator.num_pages
+    if total <= (2 * window + 1):
+        return range(1, total + 1)
+    start = max(1, current - window)
+    end = min(total, current + window)
+    while end - start < (2 * window):
+        if start > 1:
+            start -= 1
+        elif end < total:
+            end += 1
+        else:
+            break
+    return range(start, end + 1)
 
 def init_or_fix_all_counters():
     # --- complaints의 com_id 카운터 초기화 ---
@@ -19,7 +54,7 @@ def init_or_fix_all_counters():
     c1 = Counter.objects(name="complaint").first()
     if not c1 or (c1.seq or 0) < max_com_id:
         Counter.objects(name="complaint").update_one(upsert=True, set__seq=max_com_id)
-        print(f"complaint Counter 초기화: seq={max_com_id}")
+        logger.info("complaint Counter 초기화: seq=%s", max_com_id)
 
     # --- complaint_status의 status_id 카운터 초기화 ---
     last_status = ComplaintStatus.objects.order_by('-status_id').first()
@@ -27,9 +62,9 @@ def init_or_fix_all_counters():
     c2 = Counter.objects(name="complaint_status").first()
     if not c2 or (c2.seq or 0) < max_status_id:
         Counter.objects(name="complaint_status").update_one(upsert=True, set__seq=max_status_id)
-        print(f"complaint_status Counter 초기화: seq={max_status_id}")
+        logger.info("complaint_status Counter 초기화: seq=%s", max_status_id)
 
-    print("모든 Counter 초기화 완료!")
+    logger.info("모든 Counter 초기화 완료")
 
 #안전한 com_id 생성 함수
 def get_next_com_id():
@@ -54,11 +89,7 @@ def complain_add(request):
         all_complaints = []
         for c in qs:
             # 타입 문자열 통일: 공백 제거 + 빈 값 제거
-            type_display = (
-                ', '.join([t.strip() for t in c.com_type if str(t).strip()])
-                if isinstance(c.com_type, list)
-                else ', '.join([s.strip() for s in str(c.com_type).split(',') if s.strip()])
-            )
+            type_display = ', '.join(normalize_com_types(c.com_type))
             all_complaints.append({
                 "com_id": c.com_id,
                 "com_type": type_display,
@@ -86,6 +117,17 @@ def complain_add(request):
     com_contents = (request.POST.get('com_contents') or '').strip()
     com_location = (request.POST.get('com_location') or '').strip()
 
+    # 필수값 검증 (미입력 시 500 대신 안내 후 복귀)
+    if not com_types:
+        messages.error(request, '민원 유형을 1개 이상 선택해 주세요.')
+        return redirect('complain:complain_add')
+    if not com_contents:
+        messages.error(request, '민원 내용을 입력해 주세요.')
+        return redirect('complain:complain_add')
+    if len(com_contents) > 5000:
+        messages.error(request, '민원 내용은 5000자를 초과할 수 없습니다.')
+        return redirect('complain:complain_add')
+
     # (옵션) 지역 기본 prefix
     if com_location and not com_location.startswith("서울특별시"):
         com_location = "서울특별시 " + com_location
@@ -98,7 +140,6 @@ def complain_add(request):
     if is_reuse and origin_com_id:
         owned = Complaints.objects(username=username, com_id=origin_com_id).first()
         if not owned:
-            from django.contrib import messages
             messages.error(request, '잘못된 재민원 요청입니다.')
             return redirect('accounts:mypage_home')
 
@@ -108,95 +149,78 @@ def complain_add(request):
     pic1_data = com_pic1.read() if com_pic1 else None
     pic2_data = com_pic2.read() if com_pic2 else None
 
-    # 위치
-    lat_raw = request.POST.get('lat')
-    lon_raw = request.POST.get('lon')
-    lat = float(lat_raw) if lat_raw else None
-    lon = float(lon_raw) if lon_raw else None
+    # 위치 (잘못된 값이 와도 500이 나지 않도록 방어)
+    def _to_float(v):
+        try:
+            return float(v) if v else None
+        except (TypeError, ValueError):
+            return None
 
-    # 위도경도저장확인용
-    print(f"[DEBUG] lat={lat}, lon={lon}")
+    lat = _to_float(request.POST.get('lat'))
+    lon = _to_float(request.POST.get('lon'))
 
     # 새 com_id
     new_com_id = get_next_com_id()   # ← 변수명 통일
 
-    # 1) Complaints 저장
-    complaint = Complaints(
-        com_id=new_com_id,
-        username=username,
-        com_type=com_type,
-        com_contents=com_contents,
-        com_location=com_location,
-        com_reg_date=timezone.now(),
-        com_pic1=pic1_data,
-        com_pic2=pic2_data,
-        t_district_id=0,
-        com_trashcan="",
-        com_trash_type="",
-        re_complain='Y' if is_reuse else 'N',   # ← 중복 제거 (한 번만)
-        lat=lat,
-        lon=lon,
-    )
-    complaint.save()
-
-    # 2) ComplaintStatus 저장 (초기 상태: 처리중)
-    new_status_id = get_next_status_id()
-    status_doc = ComplaintStatus(
-        status_id=new_status_id,
-        com_id=new_com_id,           # ← 변수명 수정
-        status_name='처리중',
-        updated_at=timezone.now()
-    )
-    status_doc.save()
-
-    # 3) ReComplaints 저장 (재민원일 때만)
-    if is_reuse and origin_com_id:
-        ReComplaints(
-            re_request_id=str(uuid4()),         # ← uuid4 import됨
+    try:
+        # 1) Complaints 저장
+        complaint = Complaints(
+            com_id=new_com_id,
             username=username,
-            origin_com_id=origin_com_id,
-            new_com_id=new_com_id,
-            status_id=status_doc,               # ReferenceField
-            re_complain='Y',
-            created_at=timezone.now()
-        ).save()
+            com_type=com_type,
+            com_contents=com_contents,
+            com_location=com_location,
+            com_reg_date=timezone.now(),
+            com_pic1=pic1_data,
+            com_pic2=pic2_data,
+            t_district_id=0,
+            com_trashcan="",
+            com_trash_type="",
+            re_complain='Y' if is_reuse else 'N',   # ← 중복 제거 (한 번만)
+            lat=lat,
+            lon=lon,
+            current_status='처리중',
+        )
+        complaint.save()
 
-    from django.contrib import messages
+        # 2) ComplaintStatus 저장 (초기 상태: 처리중)
+        new_status_id = get_next_status_id()
+        status_doc = ComplaintStatus(
+            status_id=new_status_id,
+            com_id=new_com_id,           # ← 변수명 수정
+            status_name='처리중',
+            updated_at=timezone.now()
+        )
+        status_doc.save()
+
+        # 3) ReComplaints 저장 (재민원일 때만)
+        if is_reuse and origin_com_id:
+            ReComplaints(
+                re_request_id=str(uuid4()),         # ← uuid4 import됨
+                username=username,
+                origin_com_id=origin_com_id,
+                new_com_id=new_com_id,
+                status_id=status_doc,               # ReferenceField
+                re_complain='Y',
+                created_at=timezone.now()
+            ).save()
+    except Exception as e:
+        logger.error("민원 저장 실패: %s", e, exc_info=True)
+        messages.error(request, '민원 등록 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.')
+        return redirect('complain:complain_add')
+
     messages.success(request, '민원이 정상적으로 등록되었습니다.')
     return redirect('accounts:mypage_home')
 
 
-def trash_bin_map(request, district_id=None):
-    if district_id:
-        trashcans = TrashLoc.objects.filter(t_district_id=district_id)
-    else:
-        trashcans = TrashLoc.objects.all()
-
-    data = [
-        {
-            "t_lat": float(t.t_lat),
-            "t_lon": float(t.t_lon),
-            "t_road_addr": t.t_addr,
-            "t_detailed_addr": t.t_detailed_addr,
-            "t_trash_type": t.t_trash_type,
-            "t_loc": t.t_loc,
-            "t_dept": t.t_dept,
-            "t_contact": t.t_contact,
-            "t_district_id": t.t_district_id,
-        }
-        for t in trashcans
-    ]
-    return JsonResponse(data, safe=False)
-
-
 @login_required(login_url='accounts:login')
 def complain_reuse(request, com_id):
-    obj = Complaints.objects(com_id=int(com_id)).first()
+    # IDOR 방지: 본인이 작성한 민원만 재사용 가능
+    obj = Complaints.objects(com_id=int(com_id), username=request.user.username).first()
     if not obj:
         raise Http404("해당 민원을 찾을 수 없습니다.")
 
-    types = obj.com_type if isinstance(obj.com_type, list) \
-            else [s.strip() for s in str(obj.com_type).split(',') if s.strip()]
+    types = normalize_com_types(obj.com_type)
     lat = getattr(obj, 'lat', None) or getattr(obj, 'com_lat', None) or ''
     lon = getattr(obj, 'lon', None) or getattr(obj, 'com_lon', None) or ''
     reuse_data = {
@@ -213,10 +237,7 @@ def complain_reuse(request, com_id):
     qs = Complaints.objects(username=request.user.username).order_by('-com_reg_date')[:10]
     all_complaints = []
     for c in qs:
-        if isinstance(c.com_type, list):
-            type_display = ', '.join([t.strip() for t in c.com_type if str(t).strip()])
-        else:
-            type_display = ', '.join([s.strip() for s in str(c.com_type).split(',') if s.strip()])
+        type_display = ', '.join(normalize_com_types(c.com_type))
         all_complaints.append({
             "com_id": c.com_id,
             "com_type": type_display,
@@ -246,11 +267,7 @@ def old_complaints_api(request):
     qs = Complaints.objects(username=username).order_by('-com_reg_date')[:limit]
     items = []
     for c in qs:
-        # 타입 문자열 정리
-        if isinstance(c.com_type, list):
-            type_display = ', '.join([t.strip() for t in c.com_type if str(t).strip()])
-        else:
-            type_display = ', '.join([s.strip() for s in str(c.com_type).split(',') if s.strip()])
+        type_display = ', '.join(normalize_com_types(c.com_type))
 
         items.append({
             "com_id": c.com_id,
@@ -266,23 +283,7 @@ def old_complaints_api(request):
 @require_GET
 def all_complaints_staff(request):
     page_obj, query = build_staff_items(request, force_status=None)
-
-    # 현재 페이지 기준 5개 고정
-    current = page_obj.number
-    total = page_obj.paginator.num_pages
-    if total <= 5:
-        page_range = range(1, total + 1)
-    else:
-        start = max(1, current - 2)
-        end = min(total, current + 2)
-        while end - start < 4:
-            if start > 1:
-                start -= 1
-            elif end < total:
-                end += 1
-            else:
-                break
-        page_range = range(start, end + 1)
+    page_range = _page_range(page_obj)
 
     return render(request, "complain/staff_all_list.html", {
         "page_obj": page_obj,
@@ -295,20 +296,7 @@ def all_complaints_staff(request):
 @require_GET
 def pending_list(request):
     page_obj, query = build_staff_items(request, force_status="처리중")
-
-    # 페이지 번호 범위(현재 기준 5개 고정)
-    current = page_obj.number
-    total = page_obj.paginator.num_pages
-    if total <= 5:
-        page_range = range(1, total + 1)
-    else:
-        start = max(1, current - 2)
-        end = min(total, current + 2)
-        while end - start < 4:
-            if start > 1: start -= 1
-            elif end < total: end += 1
-            else: break
-        page_range = range(start, end + 1)
+    page_range = _page_range(page_obj)
 
     return render(request, "complain/staff_pending_list.html", {
         "page_obj": page_obj,
@@ -320,19 +308,7 @@ def pending_list(request):
 @require_GET
 def completed_list(request):
     page_obj, query = build_staff_items(request, force_status="처리완료")
-
-    current = page_obj.number
-    total = page_obj.paginator.num_pages
-    if total <= 5:
-        page_range = range(1, total + 1)
-    else:
-        start = max(1, current - 2)
-        end = min(total, current + 2)
-        while end - start < 4:
-            if start > 1: start -= 1
-            elif end < total: end += 1
-            else: break
-        page_range = range(start, end + 1)
+    page_range = _page_range(page_obj)
 
     return render(request, "complain/staff_completed_list.html", {
         "page_obj": page_obj,
@@ -345,16 +321,17 @@ def completed_list(request):
 @require_POST
 def mark_complaint_completed(request, com_id: int):
     """처리중 → 처리완료 (이력 1줄 추가 + 감사추적). 필요시 캐시도 갱신"""
-    next_url   = request.POST.get("next")
+    # 오픈 리다이렉트 방지: 외부 URL은 무시하고 내부 경로만 허용
+    next_url = _safe_next(request, request.POST.get("next"), "complain:pending_list")
 
     comp = Complaints.objects(com_id=int(com_id)).first()
     if not comp:
-        return redirect(next_url or "complain:pending_list")
+        return redirect(next_url)
 
     # 이미 최신이 완료면 중복 방지
     last = ComplaintStatus.objects(com_id=comp.com_id).order_by("-updated_at", "-status_id").first()
     if last and last.status_name == "처리완료":
-        return redirect(next_url or "complain:pending_list")
+        return redirect(next_url)
 
     # 1) 이력 추가 (감사추적: changed_by, status_note, 시각)
     ComplaintStatus(
@@ -365,8 +342,10 @@ def mark_complaint_completed(request, com_id: int):
         updated_at=timezone.now(),
     ).save()
 
+    # 2) 최신 상태 비정규화 필드 갱신(목록/통계 성능용)
+    comp.update(set__current_status="처리완료")
 
-    return redirect(next_url or "complain:pending_list")
+    return redirect(next_url)
 
 # --- 공통 파서 ---
 def _parse_date(s):
@@ -413,27 +392,28 @@ def build_staff_items(request, force_status=None):
     if lte:
         base_q &= Q(com_reg_date__lt=lte + timedelta(days=1))  # 종료일 포함
 
+    # 상태 필터를 DB 레벨에서 적용(비정규화된 current_status 사용 → 전수 로딩/항목별 상태조회 제거)
+    want = force_status or (status if status in ('처리중', '처리완료') else None)
+    if want:
+        base_q &= Q(current_status=want)
+
     docs = (Complaints.objects(base_q)
-            .only('com_id','username','com_type','com_location','com_reg_date','com_contents')
+            .only('com_id', 'username', 'com_type', 'com_location',
+                  'com_reg_date', 'com_contents', 'current_status')
             .order_by('-com_reg_date'))
 
+    # 페이지네이션을 쿼리셋에 직접 적용 → 현재 페이지(5건)만 로드
+    paginator = Paginator(docs, 5)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    # 현재 페이지 항목(최대 5건)에 대해서만 담당자/완료시각 표시용 최신 이력 조회
     items = []
-    for c in docs:
+    for c in page_obj.object_list:
         last = (ComplaintStatus.objects(com_id=c.com_id)
-                .only('status_name','changed_by','updated_at','status_id')
+                .only('status_name', 'changed_by', 'updated_at', 'status_id')
                 .order_by('-updated_at', '-status_id')
                 .first())
-        latest_status = last.status_name if last else '처리중'
-
-        items.append({'doc': c, 'last': last, 'latest_status': latest_status})
-
-    # 상태 필터(강제/선택)
-    want = force_status or (status if status in ('처리중','처리완료') else None)
-    if want:
-        items = [it for it in items if it['latest_status'] == want]
-
-    # 페이지네이션 (5개씩)
-    paginator = Paginator(items, 5)
-    page_obj = paginator.get_page(request.GET.get('page'))
+        items.append({'doc': c, 'last': last, 'latest_status': c.current_status or '처리중'})
+    page_obj.object_list = items
 
     return page_obj, {'q': q, 'status': status, 'from': d_from, 'to': d_to}

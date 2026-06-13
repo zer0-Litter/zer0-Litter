@@ -1,16 +1,32 @@
-# Django Secret Key
-SECRET_KEY='장고키'
+# ============================================================
+# zer0-Litter 환경변수 샘플
+# 이 파일을 복사해 .env 로 만들고 실제 값을 채우세요.
+#   cp .envsample .env
+# .env 는 절대 커밋하지 마세요(.gitignore 에 등록되어 있습니다).
+# ============================================================
 
-#kakaomap 키
-#KAKAO_MAP_API_KEY = '나중에'
+# --- Django ---
+# 임의의 긴 무작위 문자열. 생성 예:
+#   python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+SECRET_KEY='여기에-시크릿키'
 
-# Database 설정
-DB_NAME=디비 이름
-DB_USER=본인 것
-DB_PASSWORD=본인 것
-DB_HOST=localhost
-DB_PORT=3306
-
-
-# 배포 시 False
+# 개발: True / 운영(배포): False
 DEBUG=True
+
+# 쉼표로 구분. 운영에서는 실제 도메인/IP만 허용
+ALLOWED_HOSTS=localhost,127.0.0.1
+
+# --- MongoDB (mongoengine + pymongo) ---
+# 예: mongodb://<user>:<password>@<host>:27017/complaints_db?authSource=complaints_db
+MONGO_URI=mongodb://localhost:27017/complaints_db
+
+# --- ChromaDB (벡터 스토어) ---
+# 원격 ChromaDB 서버를 쓸 때만 지정. 비우면 로컬 ./chroma_db 사용
+CHROMA_DB_HOST=
+CHROMA_DB_PORT=8000
+
+# --- OpenAI (LangChain 챗봇 / 임베딩) ---
+OPENAI_API_KEY='sk-...'
+
+# --- Kakao Map (프론트 지도 JavaScript 키) ---
+KAKAO_MAP_API_KEY='여기에-카카오맵-JS키'

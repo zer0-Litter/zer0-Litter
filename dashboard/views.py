@@ -3,17 +3,19 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
-from datetime import timezone as py_tz, timedelta
-from common.models_mongo import Complaints, ComplaintStatus
+from datetime import timezone as py_tz
+from common.models_mongo import Complaints
 from django.conf import settings
 import folium
 import geopandas as gpd
 import os
 import re
 import json
+import logging
 import pandas as pd
 from folium.features import GeoJsonTooltip
-from collections import defaultdict
+
+logger = logging.getLogger(__name__)
 
 
 # Django 캐싱 관련 라이브러리 제거
@@ -46,7 +48,7 @@ def _get_day_of_week_counts():
     """
     MongoDB에서 직접 요일별 민원 건수를 가져오는 함수
     """
-    print("\n--- 요일별 민원 데이터 계산 중... ---")
+    logger.debug("요일별 민원 데이터 계산 중...")
     pipeline = [
         {"$group": {
             "_id": {"$dayOfWeek": "$com_reg_date"},
@@ -64,7 +66,7 @@ def _get_day_of_week_counts():
     day_labels_json = json.dumps(list(day_counts.keys()))
     day_counts_json = json.dumps(list(day_counts.values()))
 
-    print("--- 요일별 민원 데이터 계산 완료 ---")
+    logger.debug("요일별 민원 데이터 계산 완료")
 
     return day_labels_json, day_counts_json
 
@@ -193,10 +195,6 @@ def dashboard(request):
 
         sort_by = request.GET.get('sort_by')
 
-        if not gdf.empty:
-            max_count = gdf['complaint_count'].max()
-            min_count = gdf['complaint_count'].min()
-
         if sort_by == 'high' or sort_by == 'low':
             folium.GeoJson(
                 gdf,
@@ -287,18 +285,14 @@ def dashboard(request):
             )
 
     except Exception as e:
-        print(f"지도 생성 오류: {e}")
+        logger.error("지도 생성 오류: %s", e, exc_info=True)
         map_html = "지도 생성에 오류가 발생했습니다."
 
     # --- 기존 코드 수정: 캐싱 함수 호출 ---
     # Redis 캐싱 함수를 직접 데이터 가져오는 함수로 변경
     day_labels_json, day_counts_json = _get_day_of_week_counts()
 
-    # --- 추가된 디버깅 코드 ---
-    print("\n--- HTML 템플릿에 전달되는 차트 데이터 ---")
-    print(f"day_labels_json: {day_labels_json}")
-    print(f"day_counts_json: {day_counts_json}")
-    print("------------------------------------------\n")
+    logger.debug("차트 데이터 - labels=%s, counts=%s", day_labels_json, day_counts_json)
 
     fastest_district, slowest_district = get_avg_response_time()
 
@@ -307,12 +301,9 @@ def dashboard(request):
     if not slowest_district:
         slowest_district = {'district': '-', 'time': '데이터 없음'}
 
-    # --- 최종 템플릿 전달 데이터 디버깅 ---
-    print("\n--- 최종 템플릿 데이터 (dashboard) ---")
-    print(f"Day Counts: {day_counts_json}")
-    print(f"Fastest District: {fastest_district}")
-    print(f"Slowest District: {slowest_district}")
-    print("----------------------------------------\n")
+    logger.debug(
+        "대시보드 데이터 - day_counts=%s, fastest=%s, slowest=%s",
+        day_counts_json, fastest_district, slowest_district)
 
     # 갱신 시간 정보는 더 이상 Redis에서 가져오지 않으므로, 현재 시간으로 설정
     last_updated_time = timezone.now().strftime('%Y년 %m월 %d일 %H시 %M분')

@@ -1,7 +1,6 @@
 from functools import wraps
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
-from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_GET, require_POST
 from rest_framework.parsers import MultiPartParser,FormParser
 from common.models import Users
@@ -12,13 +11,14 @@ from .serializers import UserRegisterSerializer
 from django.shortcuts import redirect
 from django.contrib import messages
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.views.decorators.csrf import csrf_exempt, csrf_protect
+from django.views.decorators.csrf import csrf_protect
 from django.http import JsonResponse
 from django.contrib.auth import login as auth_login, update_session_auth_hash
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth import logout
 import re
-from common.models_mongo import Complaints, ComplaintStatus
+from common.models_mongo import Complaints
+from common.utils import normalize_com_types
 from django.contrib.auth import logout as django_logout
 from django.urls import reverse
 from django.core.paginator import Paginator
@@ -30,7 +30,6 @@ from mongoengine.errors import ValidationError, DoesNotExist
 
 # Create your views here.
 
-@method_decorator(csrf_exempt, name='dispatch')
 class RegisterView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
@@ -48,16 +47,15 @@ class RegisterView(APIView):
         return JsonResponse(serializer.errors, status=400)
 
 
-@csrf_exempt
+@require_POST
 def check_user_id(request):
-    if request.method == 'POST':
-        data = json.loads(request.body)
-        username = data.get('username')
-        is_taken = Users.objects.filter(username=username).exists()
-        return JsonResponse({'is_taken':is_taken})
+    data = json.loads(request.body)
+    username = data.get('username')
+    is_taken = Users.objects.filter(username=username).exists()
+    return JsonResponse({'is_taken':is_taken})
 
 
-@csrf_exempt
+@require_POST
 def check_password_api(request):
     if request.method == 'POST':
         data = json.loads(request.body)
@@ -74,16 +72,22 @@ def check_password_api(request):
 
 class LoginView(APIView):
     def post(self, request):
-        username = request.POST['username']
-        password = request.POST['password']
+        username = (request.POST.get('username') or '').strip()
+        password = request.POST.get('password') or ''
+
+        # 계정 열거(User enumeration) 방지: 아이디 없음/비밀번호 불일치를 동일 메시지로 응답
+        INVALID_CREDENTIALS = "아이디 또는 비밀번호가 올바르지 않습니다."
+
+        if not username or not password:
+            return Response({"message": "아이디와 비밀번호를 모두 입력해 주세요."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             user = Users.objects.get(username=username)
         except Users.DoesNotExist:
-            return Response({"message": "존재하지 않는 아이디입니다."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": INVALID_CREDENTIALS}, status=status.HTTP_400_BAD_REQUEST)
 
         if not check_password(password, user.password):
-            return Response({"message": "비밀번호가 일치하지 않습니다."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": INVALID_CREDENTIALS}, status=status.HTTP_400_BAD_REQUEST)
 
         # 비밀번호가 맞으면 JWT 발급
         refresh = RefreshToken.for_user(user)
@@ -114,6 +118,7 @@ def logout_view(request):
     return redirect('accounts:login')
 
 
+@login_required
 def mypage_edit(request): # 회원정보 수정 페이지를 보여줌
     user = request.user
     return render(request, 'accounts/mypage_edit.html', {'user':user})
@@ -150,6 +155,11 @@ def mypage_update(request):
     if new_pw:
         if not user.check_password(current):
             messages.error(request, '현재 비밀번호가 일치하지 않습니다.')
+            return redirect('accounts:mypage_edit')
+
+        # 새 비밀번호와 확인 비밀번호 일치 검증(서버단)
+        if new_pw != confirm:
+            messages.error(request, '새 비밀번호와 비밀번호 확인이 일치하지 않습니다.')
             return redirect('accounts:mypage_edit')
 
         if not is_valid_password(new_pw):
@@ -220,41 +230,26 @@ def login_required_with_modal(view_func):
 @login_required_with_modal
 def mypage_home(request):
     username = request.user.username
-    user_complaints = Complaints.objects(username=username).order_by('-com_reg_date')
+    user_complaints = Complaints.objects(username=username)
 
+    # 카운트는 DB 집계로(항목별 상태조회 제거). current_status='처리완료' 이외는 모두 처리중으로 간주.
     total_count = user_complaints.count()
-    complete_count = 0
-    processing_count = 0
+    complete_count = user_complaints.filter(current_status='처리완료').count()
+    processing_count = total_count - complete_count
 
-    for complaint in user_complaints:
-        last = ComplaintStatus.objects(com_id=complaint.com_id) \
-            .order_by('-updated_at', '-status_id').first()
-        name = last.status_name if last else '처리중'
-
-        if name == '처리완료':
-            complete_count += 1
-        else:
-            processing_count += 1
-
-    recent_complaints = user_complaints[:3]
+    recent_complaints = user_complaints.order_by('-com_reg_date')[:3]
     complaints_display = []
 
     for complaint in recent_complaints:
-        last = ComplaintStatus.objects(com_id=complaint.com_id) \
-            .order_by('-updated_at', '-status_id').first()
-        status_name = last.status_name if last else '처리중'
-
         complaint_type = complaint.com_type
-        if isinstance(complaint_type, list):
-            icon_type = complaint_type[0]  # 전체 문자열
-        else:
-            icon_type = complaint_type.split(',')[0].strip()
+        _types = normalize_com_types(complaint_type)
+        icon_type = _types[0] if _types else '기타'
 
         complaints_display.append({
             'date': complaint.com_reg_date,
             'type': complaint_type,  # 여기도 전체 리스트/문자열 그대로
             'location': complaint.com_location,
-            'status': status_name,
+            'status': complaint.current_status or '처리중',
             'icon_type': icon_type
         })
 
@@ -300,56 +295,47 @@ def complaint_all_list(request):
     if lte:
         base_q &= Q(com_reg_date__lt=lte + timedelta(days=1))  # 종료일 포함
 
+    # 상태 필터를 DB 레벨에서 적용(current_status) → 전수 로딩/항목별 상태조회 제거
+    if status in ('처리중', '처리완료'):
+        base_q &= Q(current_status=status)
+
     user_complaints = (
         Complaints.objects(base_q)
         .order_by('-com_reg_date')
     )
 
-    all_complaints = []
-    for complaint in user_complaints:
-        last = (ComplaintStatus.objects(com_id=complaint.com_id)
-                .only('status_name','updated_at','status_id')
-                .order_by('-updated_at','-status_id')
-                .first())
-        status_name = last.status_name if last else '처리중'
+    # 페이지네이션을 쿼리셋에 직접 적용 → 현재 페이지(5건)만 로드
+    paginator = Paginator(user_complaints, 5)
+    page_obj = paginator.get_page(request.GET.get('page'))
 
-        raw_type = complaint.com_type
-        if isinstance(raw_type, list):
-            type_list = [t.strip() for t in raw_type if t and str(t).strip()]
-        else:
-            type_list = [t.strip() for t in str(raw_type).split(',') if t.strip()]
-
+    page_items = []
+    for complaint in page_obj.object_list:
+        type_list = normalize_com_types(complaint.com_type)
         type_display = ', '.join(type_list) if type_list else ''
         icon_type = type_list[0] if type_list else '기타'
 
         lat = getattr(complaint, 'lat', None) or getattr(complaint, 'com_lat', None)
         lon = getattr(complaint, 'lon', None) or getattr(complaint, 'com_lon', None)
 
-        all_complaints.append({
+        page_items.append({
             'com_id': complaint.com_id,
             'date': complaint.com_reg_date,
             'type_list': type_list,
             'type_display': type_display,
             'icon_type': icon_type,
             'location': complaint.com_location,
-            'status': status_name,
+            'status': complaint.current_status or '처리중',
             'content': complaint.com_contents,
             'lat': lat,
             'lon': lon,
         })
-
-    if status in ('처리중','처리완료'):
-        all_complaints = [c for c in all_complaints if c['status'] == status]
-
-    paginator = Paginator(all_complaints, 5)
-    page_obj = paginator.get_page(request.GET.get('page'))
+    page_obj.object_list = page_items
 
     return render(request, 'accounts/complaint_all_list.html', {
         'page_obj': page_obj,
         'query': {'q': q, 'status': status, 'from': d_from, 'to': d_to}
     })
 
-@csrf_exempt
 @login_required
 @require_POST
 def complaint_update_api(request):
@@ -359,16 +345,12 @@ def complaint_update_api(request):
         return JsonResponse({"ok": False, "msg": "잘못된 요청 본문"}, status=400)
 
     com_id     = data.get("com_id")
-    title      = (data.get("title") or "").strip()
     content    = (data.get("content") or "").strip()
     location   = (data.get("location") or "").strip()
 
     # 유형은 리스트 또는 콤마문자열 모두 허용
     raw_type = data.get("type_list") or data.get("type_display")
-    if isinstance(raw_type, str):
-        type_list = [t.strip() for t in raw_type.split(",") if t.strip()]
-    else:
-        type_list = [t.strip() for t in (raw_type or []) if t and str(t).strip()]
+    type_list = normalize_com_types(raw_type)
 
     if not com_id:
         return JsonResponse({"ok": False, "msg": "com_id가 없습니다."}, status=400)
@@ -402,13 +384,5 @@ def complaint_update_api(request):
         return JsonResponse({"ok": False, "msg": f"저장 실패: {e}"}, status=400)
 
     return JsonResponse({"ok": True})
-
-
-
-def custom_login_view(request):
-    # 로그인 처리 코드...
-    # 로그인 성공 시
-    next_url = request.GET.get('next') or 'default_home'
-    return redirect(next_url)
 
 

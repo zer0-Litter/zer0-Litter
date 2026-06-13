@@ -1,15 +1,15 @@
-from django.http import HttpResponse
-from django.shortcuts import render, redirect
+from django.shortcuts import render
 from common.models import TrashLoc
-from common.models_mongo import Complaints
+from common.models_mongo import Complaints, Counter
+from common.utils import bounding_box
 from django.http import JsonResponse
 import os
+import logging
 from math import radians, cos, sin, asin, sqrt
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
-from django.utils.decorators import method_decorator
 import json
+
+logger = logging.getLogger(__name__)
 
 # Create your views here.
 
@@ -54,19 +54,27 @@ def trash_bin_map(request, district_id=None):
 
 
 def trash_bin_list(request, district_id):
-    print(
-        f"Request Params - lat: {request.GET.get('lat')}, lon: {request.GET.get('lon')}, radius: {request.GET.get('radius')}")
+    logger.debug(
+        "trash_bin_list params - lat: %s, lon: %s, radius: %s",
+        request.GET.get('lat'), request.GET.get('lon'), request.GET.get('radius'))
 
     try:
         lat = float(request.GET.get('lat'))
         lon = float(request.GET.get('lon'))
         radius = float(request.GET.get('radius', 500))  # 기본 500m
     except (TypeError, ValueError) as e:
-        print(f"[에러] 파라미터 변환 실패: {e}")
+        logger.warning("파라미터 변환 실패: %s", e)
         return JsonResponse({'error': 'Invalid parameters'}, status=400)
 
+    # bounding-box 1차 필터로 후보를 좁힌 뒤 정확한 haversine 거리로 거른다(전수 스캔 회피)
+    lat_min, lat_max, lon_min, lon_max = bounding_box(lat, lon, radius)
+    candidates = TrashLoc.objects.filter(
+        t_lat__gte=lat_min, t_lat__lte=lat_max,
+        t_lon__gte=lon_min, t_lon__lte=lon_max,
+    )
+
     nearby = []
-    for t in TrashLoc.objects.all():
+    for t in candidates:
         try:
             if not t.t_lat or not t.t_lon:
                 continue  # 값이 None이거나 빈 문자열인 경우
@@ -84,7 +92,7 @@ def trash_bin_list(request, district_id):
                     "t_contact": t.t_contact,
                 })
         except Exception as e:
-            print(f"[에러] 쓰레기통 {t.id} 처리 중 문제 발생: {e}")
+            logger.warning("쓰레기통 %s 처리 중 문제 발생: %s", t.id, e)
             continue  # 하나 실패해도 전체는 계속
 
     return JsonResponse(nearby, safe=False)
@@ -98,12 +106,7 @@ def haversine(lat1, lon1, lat2, lon2):
     a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
     return 2 * R * asin(sqrt(a))
 
-from django.db import connection
-print(connection.introspection.table_names())
 
-
-
-@csrf_exempt
 @login_required
 def save_location(request):
     if request.method == "POST":
@@ -132,11 +135,7 @@ def save_location(request):
 
     return JsonResponse({"status": "error", "msg": "POST 요청만 허용됩니다"}, status=405)
 
-from common.models_mongo import Complaints
-
-
 
 def generate_complaint_id():
-    # com_id를 가장 큰 값 + 1 로 생성
-    last = Complaints.objects.order_by("-com_id").first()
-    return 1 if not last else last.com_id + 1
+    # com_id를 Counter로 원자적으로 발급 (max+1 방식의 동시성 중복키 충돌 방지)
+    return Counter.objects(name="complaint").modify(upsert=True, new=True, inc__seq=1).seq

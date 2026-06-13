@@ -1,8 +1,5 @@
 import os, re
-from datetime import datetime, timezone
-import time
 
-import logger
 from pymongo import MongoClient, ReturnDocument
 from dotenv import load_dotenv
 from langchain_core.prompts import (
@@ -18,13 +15,14 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_chroma import Chroma
 from konlpy.tag import Okt
 import logging
-from langchain.chains import create_retrieval_chain
-from langchain_core.documents import Document
 
 from config import settings
+from common.utils import bounding_box
 
 # 💡 [추가] 거리 계산을 위한 import
 from math import radians, sin, cos, sqrt, atan2
+
+logger = logging.getLogger(__name__)
 
 # 💡 [추가] TrashLoc 모델 import (사용자 요청에 따라 경로를 'common.models'로 가정)
 try:
@@ -32,8 +30,6 @@ try:
 except ImportError:
     logger.error("common.models.TrashLoc을 import 할 수 없습니다. 쓰레기통 위치 조회 기능이 제한됩니다.")
     TrashLoc = None
-
-logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -46,25 +42,60 @@ COLLECTIONS = {
     "complaints": db['complaints'],
 }
 
-llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.5, max_tokens=70, api_key=settings.OPENAI_API_KEY)
-embeddings = OpenAIEmbeddings(api_key=settings.OPENAI_API_KEY)
-okt = Okt()
+# --- 지연 초기화(lazy init) ---
+# import 시점에 OpenAI/ChromaDB/Okt(JVM)를 생성하지 않는다.
+# (1) import 부작용/네트워크/JVM 로딩 제거로 테스트 가능, (2) 첫 사용 시 1회만 생성.
+_llm = None
+_embeddings = None
+_okt = None
+_vector_store = None
+_complaint_chain = None
+_summary_chain = None
 
-CHROMA_DB_HOST = os.getenv("CHROMA_DB_HOST")
 
-chroma_client = None
-if CHROMA_DB_HOST:
+def get_llm():
+    global _llm
+    if _llm is None:
+        _llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.5, max_tokens=70,
+                          api_key=settings.OPENAI_API_KEY)
+    return _llm
+
+
+def get_embeddings():
+    global _embeddings
+    if _embeddings is None:
+        _embeddings = OpenAIEmbeddings(api_key=settings.OPENAI_API_KEY)
+    return _embeddings
+
+
+def get_okt():
+    global _okt
+    if _okt is None:
+        _okt = Okt()
+    return _okt
+
+
+def _build_chroma_client():
+    host = os.getenv("CHROMA_DB_HOST")
+    if not host:
+        return None
     try:
-        chroma_client = HttpClient(host=CHROMA_DB_HOST, port=8000)
+        return HttpClient(host=host, port=8000)
     except Exception as e:
-        logger.error(f"ChromaDB 연결 실패: {e}", exc_info=True)
+        logger.error("ChromaDB 연결 실패: %s", e, exc_info=True)
+        return None
 
-vector_store = Chroma(
-    collection_name="complaint_embeddings",
-    embedding_function=OpenAIEmbeddings(api_key=settings.OPENAI_API_KEY),
-    persist_directory="./chroma_db",
-    client=chroma_client
-)
+
+def get_vector_store():
+    global _vector_store
+    if _vector_store is None:
+        _vector_store = Chroma(
+            collection_name="complaint_embeddings",
+            embedding_function=get_embeddings(),
+            persist_directory="./chroma_db",
+            client=_build_chroma_client(),
+        )
+    return _vector_store
 
 
 # 💡 [추가] Haversine 함수 정의
@@ -112,7 +143,11 @@ _complaint_chain_prompt = ChatPromptTemplate.from_messages([
     MessagesPlaceholder(variable_name="chat_history"),
     HumanMessagePromptTemplate.from_template("이전 민원 기록: {retrieved_context}\n\n사용자 발화: {user_input}")
 ])
-complaint_chain = _complaint_chain_prompt | llm | StrOutputParser()
+def get_complaint_chain():
+    global _complaint_chain
+    if _complaint_chain is None:
+        _complaint_chain = _complaint_chain_prompt | get_llm() | StrOutputParser()
+    return _complaint_chain
 
 # 💡 대화 내용을 요약하는 새로운 프롬프트
 _summary_prompt = ChatPromptTemplate.from_messages([
@@ -121,7 +156,11 @@ _summary_prompt = ChatPromptTemplate.from_messages([
     ),
     MessagesPlaceholder(variable_name="chat_history")
 ])
-summary_chain = _summary_prompt | llm | StrOutputParser()
+def get_summary_chain():
+    global _summary_chain
+    if _summary_chain is None:
+        _summary_chain = _summary_prompt | get_llm() | StrOutputParser()
+    return _summary_chain
 
 
 # --- 전처리 함수 ---
@@ -137,7 +176,7 @@ def preprocess_text(text):
     text = re.sub(r'[^\s\w]', '', text)
 
     # 2. Okt를 사용하여 명사 추출
-    nouns = okt.nouns(text)
+    nouns = get_okt().nouns(text)
 
     # 3. 불용어 제거
     # 사용자가 언급한 조사들을 포함하여 더 포괄적인 불용어 목록을 정의합니다.
@@ -208,6 +247,7 @@ def retrieve_complaint_history_with_filter(query, com_types, num_results=3):
         where_filter = {"com_type": {"$in": com_types}}
 
     # ❗️ 수정된 부분: 필터가 있을 때만 `filter` 인자를 전달
+    vector_store = get_vector_store()
     if where_filter:
         retriever = vector_store.as_retriever(
             search_kwargs={"k": num_results, "filter": where_filter}
@@ -217,7 +257,7 @@ def retrieve_complaint_history_with_filter(query, com_types, num_results=3):
             search_kwargs={"k": num_results}
         )
 
-    retrieved_docs = retriever.get_relevant_documents(preprocessed_query)
+    retrieved_docs = retriever.invoke(preprocessed_query)
 
     context = ""
     if retrieved_docs:
@@ -270,7 +310,7 @@ def summarize_conversation(chat_history):
     """
     langchain_chat_history = get_langchain_history(chat_history)
     try:
-        summary_result = summary_chain.invoke({"chat_history": langchain_chat_history})
+        summary_result = get_summary_chain().invoke({"chat_history": langchain_chat_history})
         return summary_result.strip()
     except Exception as e:
         logger.error(f"대화 요약 실패: {e}", exc_info=True)
@@ -286,7 +326,7 @@ def handle_complain_submit(user_input, username, session_id, chat_history, com_l
     retrieved_context = retrieve_complaint_history_with_filter(user_input, current_com_types)
 
     try:
-        llm_output = complaint_chain.invoke({
+        llm_output = get_complaint_chain().invoke({
             "chat_history": langchain_chat_history,
             "user_input": user_input,
             "retrieved_context": retrieved_context
@@ -357,7 +397,13 @@ def handle_trash_finder(user_input, username, session_id, com_location=None):
 
         nearby_counts = {100: 0, 200: 0, 300: 0}  # 미터
         try:
-            all_trashcans = TrashLoc.objects.all()
+            # 최대 임계값 300m 기준 bounding-box 1차 필터로 후보만 조회(전수 스캔 회피).
+            # 300m 밖은 카운트/최근접 응답 모두에 영향이 없어 결과가 동일하다.
+            lat_min, lat_max, lon_min, lon_max = bounding_box(user_lat, user_lon, 300)
+            all_trashcans = TrashLoc.objects.filter(
+                t_lat__gte=lat_min, t_lat__lte=lat_max,
+                t_lon__gte=lon_min, t_lon__lte=lon_max,
+            )
 
             for t in all_trashcans:
                 if t.t_lat and t.t_lon:
@@ -561,11 +607,15 @@ def chatbot_router(user_input, username, session_id=None, scenario_id=None, temp
             summary = result.get('summary', '').lower()
 
             # 키워드 기반 추정 (핸들러의 오작동을 가정하고 우회함)
+            # ⚠️ 표준 분류('청소요청'/'수리요청'/'추가요청'/'기타')와 일치시켜야
+            #    마이페이지 아이콘/관리자 필터에서 정상 매칭된다.
             inferred_types = []
             if '청소' in summary or '쌓여서' in summary or '쓰레기' in summary:
-                inferred_types.append('청소')
+                inferred_types.append('청소요청')
             if '쓰레기통' in summary or '추가' in summary or '신설' in summary:
-                inferred_types.append('쓰레기통추가')
+                inferred_types.append('추가요청')
+            if '수리' in summary or '고장' in summary or '파손' in summary:
+                inferred_types.append('수리요청')
 
             # 최종적으로 추정된 타입이 있으면 주입합니다.
             if inferred_types:
