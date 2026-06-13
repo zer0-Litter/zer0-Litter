@@ -85,7 +85,7 @@ def complain_add(request):
         lon = request.GET.get("lon")
         address = request.GET.get("address")
 
-        qs = Complaints.objects(username=username).order_by('-com_reg_date')[:10]
+        qs = Complaints.objects(user_id=request.user.id).order_by('-com_reg_date')[:10]
         all_complaints = []
         for c in qs:
             # 타입 문자열 통일: 공백 제거 + 빈 값 제거
@@ -138,7 +138,7 @@ def complain_add(request):
     origin_com_id = int(origin_raw) if origin_raw.isdigit() else None
 
     if is_reuse and origin_com_id:
-        owned = Complaints.objects(username=username, com_id=origin_com_id).first()
+        owned = Complaints.objects(user_id=request.user.id, com_id=origin_com_id).first()
         if not owned:
             messages.error(request, '잘못된 재민원 요청입니다.')
             return redirect('accounts:mypage_home')
@@ -166,6 +166,7 @@ def complain_add(request):
         # 1) Complaints 저장
         complaint = Complaints(
             com_id=new_com_id,
+            user_id=request.user.id,
             username=username,
             com_type=com_type,
             com_contents=com_contents,
@@ -215,8 +216,8 @@ def complain_add(request):
 
 @login_required(login_url='accounts:login')
 def complain_reuse(request, com_id):
-    # IDOR 방지: 본인이 작성한 민원만 재사용 가능
-    obj = Complaints.objects(com_id=int(com_id), username=request.user.username).first()
+    # IDOR 방지: 본인이 작성한 민원만 재사용 가능 (소유권은 user_id 기준)
+    obj = Complaints.objects(com_id=int(com_id), user_id=request.user.id).first()
     if not obj:
         raise Http404("해당 민원을 찾을 수 없습니다.")
 
@@ -234,7 +235,7 @@ def complain_reuse(request, com_id):
     }
 
     # 최근 민원 10건(그대로 유지)
-    qs = Complaints.objects(username=request.user.username).order_by('-com_reg_date')[:10]
+    qs = Complaints.objects(user_id=request.user.id).order_by('-com_reg_date')[:10]
     all_complaints = []
     for c in qs:
         type_display = ', '.join(normalize_com_types(c.com_type))
@@ -261,10 +262,9 @@ def complain_reuse(request, com_id):
 @login_required
 @require_GET
 def old_complaints_api(request):
-    username = request.user.username
     limit = int(request.GET.get('limit', 10))
 
-    qs = Complaints.objects(username=username).order_by('-com_reg_date')[:limit]
+    qs = Complaints.objects(user_id=request.user.id).order_by('-com_reg_date')[:limit]
     items = []
     for c in qs:
         type_display = ', '.join(normalize_com_types(c.com_type))

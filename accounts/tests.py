@@ -76,9 +76,10 @@ def test_login_wrong_password_and_unknown_user_same_message(client):
 def test_mypage_counts_use_current_status(client):
     from common.models_mongo import Complaints
     user = _make_user(username="kim")
-    Complaints(com_id=1, username="kim", com_type="청소요청", current_status="처리중").save()
-    Complaints(com_id=2, username="kim", com_type="수리요청", current_status="처리완료").save()
-    Complaints(com_id=3, username="kim", com_type="기타", current_status="처리완료").save()
+    uid = user.id
+    Complaints(com_id=1, user_id=uid, username="kim", com_type="청소요청", current_status="처리중").save()
+    Complaints(com_id=2, user_id=uid, username="kim", com_type="수리요청", current_status="처리완료").save()
+    Complaints(com_id=3, user_id=uid, username="kim", com_type="기타", current_status="처리완료").save()
     client.force_login(user)
     r = client.get("/accounts/mypage_home/")
     assert r.status_code == 200

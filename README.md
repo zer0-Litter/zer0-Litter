@@ -221,7 +221,8 @@ zer0-Litter/
 - ✅ **조회 성능(N+1) 제거** — `Complaints.current_status` 비정규화 필드 도입으로 관리자/내 민원 목록·마이페이지를 전수 로딩+항목별 상태조회에서 **DB 레벨 필터 + 페이지 단위 조회**로 전환 (백필 커맨드: `python manage.py backfill_current_status`)
 - ✅ **쓰레기통 근접 검색 최적화** — 전수 스캔 → 위경도 **bounding-box 1차 필터** 후 정확 거리 계산 (실데이터 5,222건 기준 전수 스캔과 동일 결과 검증)
 - ✅ **서비스 계층 분리** — 비대했던 `chatbot_api` 뷰의 영속화/민원 생성 로직을 `chatbot/services.py`로 분리, 단위 테스트 가능화
-- ✅ **CI 파이프라인** — GitHub Actions(`.github/workflows/ci.yml`)로 push·PR 시 35개 테스트 자동 실행
+- ✅ **CI 파이프라인** — GitHub Actions(`.github/workflows/ci.yml`)로 push·PR 시 테스트 자동 실행
+- ✅ **교차 저장소 정합성** — 민원에 `user_id`(SQLite Users.pk) 안정 식별자를 두어 소유권 판정을 username→user_id 로 전환(IDOR·이름변경 견고), 계정 삭제 시 MongoDB 연관 데이터(민원·상태·재민원·채팅·파일) 자동 정리(`post_delete` 신호). 백필: `python manage.py backfill_user_id`
 
 ### 개선 예정
-- **저장소 정합성** — SQLite ↔ MongoDB 간 참조 무결성 보강 또는 저장소 통합 검토
+- **저장소 통합 검토** — 운영 규모 확대 시 Users/민원의 단일 DB(예: PostgreSQL) 통합 또는 user_id 외 ChatHistory 등 잔여 컬렉션까지 참조 일원화
