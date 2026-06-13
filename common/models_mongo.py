@@ -23,6 +23,10 @@ class ComplaintStatus(Document):
 class Complaints(Document):
     com_id = IntField(required=True, unique=True, db_field='com_id')  # 자동 증가 직접 관리 필요
     t_district_id = IntField()
+    # SQLite Users.pk 를 가리키는 안정 식별자(소유권 판정의 기준).
+    # username 은 표시/검색/크롤러용으로 유지하되, 소유권은 user_id 로 본다.
+    # 크롤러/게스트 등 실제 회원이 없는 경우 None.
+    user_id = IntField(null=True)
     username = StringField(max_length=255, required=True)
     re_complain = StringField(max_length=255)
     com_trashcan = StringField(max_length=255)
@@ -39,7 +43,8 @@ class Complaints(Document):
     # 정본 이력은 ComplaintStatus 컬렉션에 그대로 남고, 이 필드는 '최신값' 캐시.
     current_status = StringField(max_length=50, default='처리중')
 
-    meta = {'collection': 'complaints', 'indexes': ['username', 'current_status', '-com_reg_date']}
+    meta = {'collection': 'complaints',
+            'indexes': ['user_id', 'username', 'current_status', '-com_reg_date']}
 
 
 class ReComplaints(Document):

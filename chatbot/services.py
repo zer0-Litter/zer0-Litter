@@ -186,7 +186,7 @@ def _resolve_com_location(session_id, temp_com_location):
     return ''
 
 
-def create_complaint_from_chat(username, session_id, temp_com_location, result):
+def create_complaint_from_chat(username, session_id, temp_com_location, result, user_id=None):
     """대화가 최종 확정(is_final)되면 민원을 생성하고 임베딩한다.
 
     반환:
@@ -220,6 +220,7 @@ def create_complaint_from_chat(username, session_id, temp_com_location, result):
 
     complaint_data = {
         "com_id": complaint_id,
+        "user_id": user_id,
         "username": username,
         "com_type": com_type_for_db,
         "lat": location_doc.latitude,

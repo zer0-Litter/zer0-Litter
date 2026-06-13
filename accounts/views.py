@@ -229,8 +229,8 @@ def login_required_with_modal(view_func):
 @require_GET
 @login_required_with_modal
 def mypage_home(request):
-    username = request.user.username
-    user_complaints = Complaints.objects(username=username)
+    # 소유권은 안정 식별자 user_id 로 판정(username 변경/표시와 무관)
+    user_complaints = Complaints.objects(user_id=request.user.id)
 
     # 카운트는 DB 집계로(항목별 상태조회 제거). current_status='처리완료' 이외는 모두 처리중으로 간주.
     total_count = user_complaints.count()
@@ -264,14 +264,13 @@ def mypage_home(request):
 
 @login_required
 def complaint_all_list(request):
-    username = request.user.username
-
     q = (request.GET.get('q') or '').strip()
     status = (request.GET.get('status') or '').strip()
     d_from = (request.GET.get('from') or '').strip()
     d_to = (request.GET.get('to') or '').strip()
 
-    base_q = Q(username=username)
+    # 소유권은 user_id 기준
+    base_q = Q(user_id=request.user.id)
     if q:
         base_q &= (
             Q(com_contents__icontains=q) |
@@ -355,9 +354,9 @@ def complaint_update_api(request):
     if not com_id:
         return JsonResponse({"ok": False, "msg": "com_id가 없습니다."}, status=400)
 
-    # 본인 소유 문서만
+    # 본인 소유 문서만 (소유권은 user_id 로 판정 → IDOR 방지, username 변경에도 견고)
     try:
-        doc = Complaints.objects.get(com_id=int(com_id), username=request.user.username)
+        doc = Complaints.objects.get(com_id=int(com_id), user_id=request.user.id)
     except (DoesNotExist, ValidationError, ValueError):
         return JsonResponse({"ok": False, "msg": "민원을 찾을 수 없습니다."}, status=404)
 

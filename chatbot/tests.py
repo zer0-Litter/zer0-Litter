@@ -85,12 +85,13 @@ def test_create_complaint_success(monkeypatch):
     _save_user_location_msg("s3", 37.5, 127.0)
 
     result = {"is_final": True, "com_type": ["청소요청", "기타"], "summary": "쓰레기 민원 요약"}
-    msg = services.create_complaint_from_chat("u", "s3", "서울특별시 중구", result)
+    msg = services.create_complaint_from_chat("u", "s3", "서울특별시 중구", result, user_id=42)
 
     assert msg is None
     assert Complaints.objects.count() == 1
     c = Complaints.objects.first()
     assert c.com_id >= services.CHATBOT_COM_ID_BASE  # 챗봇 민원 ID 공간
+    assert c.user_id == 42  # 안정 식별자 저장
     assert c.com_type == "청소요청, 기타"
     assert c.com_location == "서울특별시 중구"
     assert c.current_status == "처리중"

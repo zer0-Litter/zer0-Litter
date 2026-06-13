@@ -49,7 +49,9 @@ def chatbot_api(request):
     # 첫 요청 시 1회 ChromaDB 초기 로드
     services.ensure_chroma_loaded()
 
-    username = request.user.username if getattr(request.user, "is_authenticated", False) else "guest"
+    is_authed = getattr(request.user, "is_authenticated", False)
+    username = request.user.username if is_authed else "guest"
+    user_id = request.user.id if is_authed else None
     user_input = (request.POST.get('message') or '').strip()
     scenario_id = request.POST.get('scenario_id') or 'default'
     reset_session = (request.POST.get('reset_session') or '').lower() == 'true'
@@ -87,7 +89,8 @@ def chatbot_api(request):
 
     # 최종 확정 시 민원 자동 생성
     try:
-        error_msg = services.create_complaint_from_chat(username, session_id, temp_com_location, result)
+        error_msg = services.create_complaint_from_chat(
+            username, session_id, temp_com_location, result, user_id=user_id)
     except Exception as e:
         logger.error("Complaints 및 임베딩 자동 생성 실패: %s", e, exc_info=True)
         return JsonResponse({
