@@ -139,6 +139,9 @@
 
 <!-- ✅ 스크립트 -->
   <script>
+    // CSRF 토큰: 서버에서 렌더링(동시에 csrftoken 쿠키도 설정됨)
+    const CSRF_TOKEN = "{{ csrf_token }}";
+
     function showModal(message, arg2 = null, arg3 = null) {
       const modal = document.getElementById('common-modal');
       const messageBox = document.getElementById('modal-message');
@@ -321,7 +324,7 @@
 
       fetch("{% url 'accounts:complain_update_api' %}", {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
         credentials: 'same-origin',
         body: JSON.stringify(payload)
       })

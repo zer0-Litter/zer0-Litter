@@ -1,5 +1,5 @@
-from mongoengine import FloatField, BooleanField, DecimalField, DictField, StringField, FileField
-from mongoengine import Document, StringField, DateTimeField, DateField
+from mongoengine import FloatField, BooleanField, DictField, StringField
+from mongoengine import Document, DateTimeField
 from mongoengine import IntField, BinaryField, ReferenceField
 
 
@@ -33,10 +33,13 @@ class Complaints(Document):
     com_location = StringField(max_length=255)
     lat = FloatField(null=True)
     lon = FloatField(null=True)
-    com_contents = StringField(max_length=255)
+    com_contents = StringField(max_length=5000)
     com_reg_date = DateTimeField()
+    # 최신 처리 상태를 비정규화로 저장(목록/통계의 N+1 조회 제거용).
+    # 정본 이력은 ComplaintStatus 컬렉션에 그대로 남고, 이 필드는 '최신값' 캐시.
+    current_status = StringField(max_length=50, default='처리중')
 
-    meta = {'collection': 'complaints'}
+    meta = {'collection': 'complaints', 'indexes': ['username', 'current_status', '-com_reg_date']}
 
 
 class ReComplaints(Document):

@@ -30,9 +30,14 @@ SECRET_KEY = env("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 #배포할 때 False 여야 함
-DEBUG = env.bool('DEBUG', default=True)
+DEBUG = env.bool('DEBUG', default=False)
 
-ALLOWED_HOSTS = ['*', 'localhost', '127.0.0.1']
+# SECURITY: '*'(전체 허용)를 제거하고 환경변수로 허용 호스트를 제한.
+# 예) ALLOWED_HOSTS=example.com,15.168.21.218
+ALLOWED_HOSTS = env.list(
+    'ALLOWED_HOSTS',
+    default=['localhost', '127.0.0.1', '15.168.21.218'],
+)
 
 AUTH_USER_MODEL = 'common.Users'
 
@@ -180,28 +185,63 @@ STATICFILES_DIRS = [
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# csrf 에러 방지.
-CSRF_COOKIE_SECURE = False  # 배포 시 true임 HTTPS 환경에서만 동작하도록 설정되어 있다면 HTTPS가 아닌 경우 비활성화
-CSRF_COOKIE_HTTPONLY = False  # HTTPOnly 쿠키를 사용 중인지 확인
+# 보안 쿠키/전송 설정
+# 개발(DEBUG=True)에서는 HTTP로도 동작하도록 완화하고,
+# 운영(DEBUG=False)에서는 HTTPS 전용 + 보호 옵션을 강제한다.
+SECURE_FLAGS = not DEBUG
+
+CSRF_COOKIE_SECURE = SECURE_FLAGS       # 운영: HTTPS에서만 CSRF 쿠키 전송
+SESSION_COOKIE_SECURE = SECURE_FLAGS    # 운영: HTTPS에서만 세션 쿠키 전송
+# CSRF 토큰은 프런트 AJAX가 getCookie('csrftoken')로 읽어 X-CSRFToken 헤더에 실으므로
+# HttpOnly로 막으면 안 된다. (CSRF 토큰은 세션 비밀이 아님)
+CSRF_COOKIE_HTTPONLY = False
+SESSION_COOKIE_HTTPONLY = True          # 세션 쿠키는 JS 접근 차단
+
+if SECURE_FLAGS:
+    SECURE_SSL_REDIRECT = True                       # HTTP → HTTPS 리다이렉트
+    SECURE_HSTS_SECONDS = 31536000                   # 1년 HSTS
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    # 리버스 프록시(nginx 등) 뒤에서 HTTPS를 종단할 때 필요
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1',
     'http://localhost',
-    'http://15.168.21.218:8080/'
+    'http://15.168.21.218:8080',
 ]
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        },
+    },
     'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard',
+        },
         'file': {
-            'level': 'DEBUG',
+            # 세션/민감정보가 평문 로그로 남지 않도록 WARNING 이상만 기록
+            'level': 'WARNING',
             'class': 'logging.FileHandler',
             'filename': 'debug.log',
+            'formatter': 'standard',
         },
     },
     'loggers': {
+        # 우리 앱 로거: 개발(DEBUG=True)에서는 DEBUG, 운영에서는 INFO 이상만 콘솔에 출력
+        'accounts': {'handlers': ['console'], 'level': 'DEBUG' if DEBUG else 'INFO', 'propagate': False},
+        'chatbot': {'handlers': ['console'], 'level': 'DEBUG' if DEBUG else 'INFO', 'propagate': False},
+        'complain': {'handlers': ['console'], 'level': 'DEBUG' if DEBUG else 'INFO', 'propagate': False},
+        'dashboard': {'handlers': ['console'], 'level': 'DEBUG' if DEBUG else 'INFO', 'propagate': False},
+        'trash_loc': {'handlers': ['console'], 'level': 'DEBUG' if DEBUG else 'INFO', 'propagate': False},
         'django.contrib.sessions': {
             'handlers': ['file'],
-            'level': 'DEBUG',
+            'level': 'WARNING',
             'propagate': True,
         },
     },
@@ -212,7 +252,7 @@ INTERNAL_IPS = [
 ]
 
 LOGIN_URL = '/accounts/login/'  # 로그인하지 않았을 때 이동할 로그인 페이지
-LOGIN_REDIRECT_URL = '/trach_loc/home/'  # 로그인 후 이동할 기본 페이지
+LOGIN_REDIRECT_URL = '/'  # 로그인 후 이동할 기본 페이지(trash_loc:home)
 
 # CACHES = {
 #     "default": {

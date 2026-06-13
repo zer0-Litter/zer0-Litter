@@ -1,0 +1,46 @@
+# ============================================================
+# 직접(top-level) 의존성만 정리한 파일.
+# 전이 의존성까지 포함된 고정 버전은 requirements.txt(전체 lock) 참고.
+#
+# 설치(개발):   pip install -r requirements.txt   # 재현 가능한 고정 버전
+# 의존성 갱신:  pip-compile requirements.in       # requirements.txt 재생성(pip-tools)
+# ============================================================
+
+# --- Web / API ---
+Django==5.2.6
+djangorestframework==3.16.1
+djangorestframework-simplejwt==5.5.1
+django-environ==0.12.0
+python-dotenv==1.1.1
+
+# --- Database (MongoDB) ---
+pymongo==4.15.0
+mongoengine==0.29.1
+
+# --- LLM / RAG (LangChain + OpenAI + ChromaDB) ---
+langchain==0.3.27
+langchain-core==0.3.76
+langchain-openai==0.3.33
+langchain-chroma==0.2.6
+chromadb==1.0.21
+openai==1.107.2
+tiktoken==0.11.0
+
+# --- 한국어 NLP ---
+konlpy==0.6.0
+
+# --- 데이터 분석 / 지리정보 시각화 ---
+pandas==2.3.2
+geopandas==1.1.1
+folium==0.12.1
+pyproj==3.7.2
+pyogrio==0.11.1
+
+# --- 기타 유틸 ---
+python-dateutil==2.9.0.post0
+requests==2.32.4
+
+# --- 개발/테스트 (운영 배포에는 불필요) ---
+pytest
+pytest-django
+mongomock

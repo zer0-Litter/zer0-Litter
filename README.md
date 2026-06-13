@@ -29,6 +29,51 @@
 | **시각화** | **Chart.js, Folium** | 대시보드 통계 및 지도 시각화. |
 | **운영 인프라** | **Docker, Tailscale VPN** | 서비스 구성요소 컨테이너화 및 팀원 간 안전한 DB 원격 접근 환경 구축. |
 
+### 시스템 아키텍처
+
+```mermaid
+flowchart TD
+    subgraph Client["사용자 / 관리자 (브라우저)"]
+        U[Django 템플릿 + Kakao Map JS]
+    end
+
+    subgraph Web["Django 웹 애플리케이션"]
+        ACC[accounts<br/>인증 JWT+세션]
+        TL[trash_loc<br/>지도/홈]
+        CP[complain<br/>민원 CRUD/처리]
+        CB[chatbot<br/>RAG 챗봇]
+        DB[dashboard<br/>분석]
+    end
+
+    subgraph Stores["데이터 저장소"]
+        SQL[(SQLite<br/>Users · TrashLoc)]
+        MONGO[(MongoDB<br/>Complaints · Status · ChatHistory)]
+        CHROMA[(ChromaDB<br/>민원 임베딩)]
+    end
+
+    subgraph External["외부 서비스"]
+        OPENAI[OpenAI API]
+        KAKAO[Kakao Map API]
+    end
+
+    subgraph Pipeline["데이터 파이프라인 (별도 스택)"]
+        AF[Airflow DAG]
+        SE[Selenium 크롤러]
+    end
+
+    U --> ACC & TL & CP & CB & DB
+    ACC --> SQL
+    TL --> SQL
+    CP --> MONGO
+    CB --> MONGO
+    CB --> CHROMA
+    CB --> OPENAI
+    DB --> MONGO
+    U --> KAKAO
+    AF --> SE --> AF
+    AF --> MONGO
+```
+
 ---
 
 ## ⚙️ 데이터 파이프라인 상세
@@ -77,3 +122,99 @@
 | **박OO** (팀장, PM & DS) | Data, DS, FE/BE, Git/일정 | RAG 챗봇 구현 및 ChromaDB 구축, 챗봇/대시보드/Nav 구현, 임베딩/스케줄링 코드, PPT |
 | **진OO** (DE) | Data, DE, FE/BE, 노션 관리 | 민원 DB 크롤링/전처리, SQLite/MongoDB 구축, DB관리, Airflow 스케줄링 설정, 로그인/마이페이지/대시보드 FE/BE 구현, |
 | **고OO** (DE) | Data, DE, FE/BE, 노션 관리 | 쓰레기통 DB 전처리, 기획/로고 디자인,  DB/Airflow 관리 |
+
+---
+
+## 🚀 시작하기 (로컬 실행)
+
+### 1. 사전 준비
+- Python 3.11+
+- MongoDB (로컬 또는 `../mongodb/docker-compose.yml` 사용)
+- OpenAI API 키, Kakao Map JavaScript 키
+
+### 2. 클론 & 의존성 설치
+```bash
+git clone <repo-url>
+cd zer0-Litter
+python -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### 3. 환경 변수 설정
+```bash
+cp .envsample .env
+# .env 를 열어 실제 값 입력 (아래 '환경 변수' 표 참고)
+```
+
+### 4. MongoDB 기동 (Docker 사용 시)
+```bash
+cd ../mongodb && docker compose up -d && cd ../zer0-Litter
+```
+
+### 5. DB 마이그레이션 & 실행
+```bash
+python manage.py migrate
+python manage.py createsuperuser   # 관리자(스태프) 계정 생성
+python manage.py runserver         # http://127.0.0.1:8000
+```
+
+### 6. (선택) ChromaDB 임베딩 재생성
+```bash
+python rebuild_chromadb.py
+```
+
+### 7. (선택) 데이터 파이프라인 실행
+```bash
+cd ../airflow-docker
+docker compose up -d               # Airflow UI: http://localhost:8080
+```
+
+---
+
+## 🔑 환경 변수
+
+`.env` 파일에 설정합니다. 전체 목록은 [`.envsample`](.envsample) 참고.
+
+| 키 | 필수 | 설명 |
+|----|:---:|------|
+| `SECRET_KEY` | ✅ | Django 시크릿 키 |
+| `DEBUG` | ✅ | 개발 `True` / 운영 `False` |
+| `ALLOWED_HOSTS` | ✅ | 허용 호스트(쉼표 구분) |
+| `MONGO_URI` | ✅ | MongoDB 접속 URI |
+| `OPENAI_API_KEY` | ✅ | 챗봇/임베딩용 OpenAI 키 |
+| `KAKAO_MAP_API_KEY` | ✅ | Kakao Map JavaScript 키 |
+| `CHROMA_DB_HOST` | ❌ | 원격 ChromaDB 호스트(미설정 시 로컬 `./chroma_db`) |
+| `CHROMA_DB_PORT` | ❌ | ChromaDB 포트(기본 8000) |
+
+---
+
+## 📁 디렉토리 구조
+
+```
+zer0-Litter/
+├── config/          # Django 프로젝트 설정 (settings, urls)
+├── accounts/        # 회원가입/로그인(JWT+세션), 마이페이지
+├── common/          # 공통 모델 (Users, TrashLoc, Mongo 문서 모델)
+├── trash_loc/       # 홈 화면, 쓰레기통 지도/목록 API
+├── complain/        # 민원 접수/재민원, 관리자 처리 워크플로우
+├── chatbot/         # RAG 챗봇 (core 로직 + API 뷰)
+├── dashboard/       # 분석 대시보드 (집계 + Folium 지도)
+├── templates/       # Django 템플릿
+├── static/          # CSS / JS / 이미지 / 지리 데이터(shp)
+├── rebuild_chromadb.py   # ChromaDB 임베딩 재생성 스크립트
+├── requirements.in       # 직접 의존성
+└── requirements.txt      # 전체 고정 버전(lock)
+
+../airflow-docker/   # 데이터 파이프라인(크롤링→적재) — 별도 Docker 스택
+../mongodb/          # MongoDB Docker Compose + 초기화 스크립트
+```
+
+---
+
+## 🧭 알려진 한계 / 개선 예정
+
+- **자동화 테스트 도입** — 핵심 경로(인증·민원·권한·챗봇 분류)부터 pytest-django 적용 예정
+- **조회 성능 개선** — 관리자 목록의 N+1 쿼리/인메모리 페이지네이션을 상태값 비정규화 또는 단일 aggregation + DB 레벨 페이징으로 전환 예정
+- **쓰레기통 근접 검색 최적화** — 전수 스캔 → 위경도 bounding-box 1차 필터 또는 2dsphere 공간 인덱스 도입 예정
+- **저장소 정합성** — SQLite ↔ MongoDB 간 참조 무결성 보강 또는 저장소 통합 검토
