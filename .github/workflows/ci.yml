@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: pytest
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.in
+
+      # konlpy(Okt) 형태소 분석기는 런타임에 JVM 이 필요하다
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # requirements.in 은 직접 의존성만 담고 mysqlclient(리눅스 빌드 까다로움)를 제외한다
+          pip install -r requirements.in
+
+      - name: Run tests
+        # 환경변수(SECRET_KEY 등)는 conftest.py 가 테스트용 기본값을 주입하므로 별도 설정 불필요.
+        # MongoDB 는 mongomock(in-memory), DB 는 SQLite 테스트 DB 를 사용한다.
+        run: pytest

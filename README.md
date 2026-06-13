@@ -1,5 +1,7 @@
 # 🗑️ zer0 Litter (0L)
 
+[![CI](https://github.com/zer0-Litter/zer0-Litter/actions/workflows/ci.yml/badge.svg)](https://github.com/zer0-Litter/zer0-Litter/actions/workflows/ci.yml)
+
 **쓰레기통 위치 확인 및 민원 신고 챗봇 서비스**
 
 쓰레기 무단 투기 문제를 해결하고 지자체의 행정 효율을 높이기 위해, AI 챗봇을 활용하여 시민들이 **가까운 쓰레기통 위치를 쉽게 찾고 민원을 간편하게 신고**할 수 있도록 돕는 B2C/B2G 통합 플랫폼입니다.
@@ -219,7 +221,7 @@ zer0-Litter/
 - ✅ **조회 성능(N+1) 제거** — `Complaints.current_status` 비정규화 필드 도입으로 관리자/내 민원 목록·마이페이지를 전수 로딩+항목별 상태조회에서 **DB 레벨 필터 + 페이지 단위 조회**로 전환 (백필 커맨드: `python manage.py backfill_current_status`)
 - ✅ **쓰레기통 근접 검색 최적화** — 전수 스캔 → 위경도 **bounding-box 1차 필터** 후 정확 거리 계산 (실데이터 5,222건 기준 전수 스캔과 동일 결과 검증)
 - ✅ **서비스 계층 분리** — 비대했던 `chatbot_api` 뷰의 영속화/민원 생성 로직을 `chatbot/services.py`로 분리, 단위 테스트 가능화
+- ✅ **CI 파이프라인** — GitHub Actions(`.github/workflows/ci.yml`)로 push·PR 시 35개 테스트 자동 실행
 
 ### 개선 예정
 - **저장소 정합성** — SQLite ↔ MongoDB 간 참조 무결성 보강 또는 저장소 통합 검토
-- **CI 파이프라인** — 테스트 자동 실행(GitHub Actions) 도입 검토
